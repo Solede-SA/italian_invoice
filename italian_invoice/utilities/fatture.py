@@ -424,7 +424,7 @@ def prepare_and_attach_invoice(doc, replace=False):
     item_meta = frappe.get_meta("Sales Invoice Item")
 
     invoice_xml = frappe.render_template(
-        "cbmedical/templates/fatture/e-invoice.xml",
+        "italian_invoice/templates/fatture/e-invoice.xml",
         context={"doc": invoice, "item_meta": item_meta},
         is_path=True,
     )
