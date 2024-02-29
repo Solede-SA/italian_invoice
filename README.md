@@ -1,6 +1,6 @@
 ## Italian Invoice
 
-App per la gestione della Fattura Elettronica in Italia
+Gestione della Fatturazione Elettronica in Italia
 
 #### License
 
