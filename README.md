@@ -1,6 +1,6 @@
-## Fatturazione Elettronica
+## Italian Invoice
 
-Modulo per la gestione della faturazione Elettronica in Italia
+App per la gestione della Fattura Elettronica in Italia
 
 #### License
 

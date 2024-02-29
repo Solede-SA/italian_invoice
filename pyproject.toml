@@ -1,9 +1,9 @@
 [project]
 name = "italian_invoice"
 authors = [
-    { name = "info@solede.com", email = "info@solede.com"}
+    { name = "Solede", email = "info@solede.com"}
 ]
-description = "Modulo per la gestione della faturazione Elettronica in Italia"
+description = "App per la gestione della Fattura Elettronica in Italia"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]

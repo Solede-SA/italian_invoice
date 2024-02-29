@@ -1,7 +1,7 @@
 app_name = "italian_invoice"
-app_title = "Fatturazione Elettronica"
-app_publisher = "info@solede.com"
-app_description = "Modulo per la gestione della faturazione Elettronica in Italia"
+app_title = "Italian Invoice"
+app_publisher = "Solede"
+app_description = "App per la gestione della Fattura Elettronica in Italia"
 app_email = "info@solede.com"
 app_license = "mit"
 # required_apps = []
