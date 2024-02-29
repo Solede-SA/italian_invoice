@@ -227,3 +227,6 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+doctype_js = {
+    "Sales Invoice": "public/js/custom_sales_invoice.js",
+}
