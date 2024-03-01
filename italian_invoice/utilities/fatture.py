@@ -462,14 +462,12 @@ def validate_invoice(docname):
     e_invoice_fileDoc = generate_single_invoice(docname)
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
     xsd_file = frappe.get_app_path("italian_invoice", "utilities/schema_vfpr12.xsd")
-    print(xml_file, xsd_file)
 
     try:
         validate(xml_file, xsd_file)
         print("Il file XML è valido")
     except Exception as e:
         # Stampa dettagli dell'errore
-        print(f"Errore di validazione: {e}")
         frappe.throw(
             _("Errore di validazione: {0}").format(e), title=_("Errore di validazione")
         )
