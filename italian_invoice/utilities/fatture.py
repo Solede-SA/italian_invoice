@@ -461,7 +461,7 @@ def generate_single_invoice(docname):
 def validate_invoice(docname):
     e_invoice_fileDoc = generate_single_invoice(docname)
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
-    xsd_file = frappe.get_app_path("italian_invoice", "utilities/Schema_VFPR12.xsd")
+    xsd_file = frappe.get_app_path("italian_invoice", "public/Schema_VFPR12.xsd")
 
     try:
         validate(xml_file, xsd_file)
