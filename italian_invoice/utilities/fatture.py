@@ -5,6 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import cstr, flt
 from frappe.utils.file_manager import remove_file
+from xmlschema import validate
 
 from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from erpnext.regional.italy import state_codes

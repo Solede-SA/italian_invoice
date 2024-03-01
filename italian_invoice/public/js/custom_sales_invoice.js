@@ -1,7 +1,8 @@
 frappe.ui.form.on("Sales Invoice", {
     refresh: (frm) => {
+        frm.remove_custom_button('Generate E-Invoice');
         if(frm.doc.docstatus == 1) {
-            frm.add_custom_button(__('Genera E-Invoice'), () => {
+            frm.add_custom_button(__('Scarica XML'), () => {
                 frm.call({
                     method: "italian_invoice.utilities.fatture.generate_single_invoice",
                     args: {
@@ -17,7 +18,8 @@ frappe.ui.form.on("Sales Invoice", {
                         }
                     }
                 });
-            });
+            }, __("Fatt. Elettronica"));
         }
     }
 });
+
