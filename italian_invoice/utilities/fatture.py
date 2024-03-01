@@ -454,7 +454,26 @@ def generate_single_invoice(docname):
     frappe.has_permission("Sales Invoice", doc=doc, throw=True)
 
     e_invoice = prepare_and_attach_invoice(doc, True)
-    return e_invoice.file_url
+    return e_invoice
+
+
+@frappe.whitelist()
+def validate_invoice(docname):
+    e_invoice_fileDoc = generate_single_invoice(docname)
+    xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
+    xsd_file = frappe.get_app_path("italian_invoice", "utilities/Schema_VFPR12.xsd")
+
+    try:
+        validate(xml_file, xsd_file)
+        print("Il file XML è valido")
+    except Exception as e:
+        # Stampa dettagli dell'errore
+        print(f"Errore di validazione: {e}")
+        frappe.throw(
+            _("Errore di validazione: {0}").format(e), title=_("Errore di validazione")
+        )
+
+    return e_invoice_fileDoc.file_url
 
 
 # Delete e-invoice attachment on cancel.

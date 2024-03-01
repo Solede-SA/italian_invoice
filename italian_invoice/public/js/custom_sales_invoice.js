@@ -4,7 +4,7 @@ frappe.ui.form.on("Sales Invoice", {
         if(frm.doc.docstatus == 1) {
             frm.add_custom_button(__('Scarica XML'), () => {
                 frm.call({
-                    method: "italian_invoice.utilities.fatture.generate_single_invoice",
+                    method: "italian_invoice.utilities.fatture.validate_invoice",
                     args: {
                         docname: frm.doc.name
                     },
