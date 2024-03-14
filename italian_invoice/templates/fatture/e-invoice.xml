@@ -8,6 +8,27 @@
 {%- endif %}
 {%- endmacro -%}
 
+{%- macro render_dati_ordine_acquisto(items) -%}
+  {%- for item in items %}
+        {%- if item.sales_order -%}
+            {%- set salesOrder = frappe.get_doc('Sales Order', item.sales_order) -%}
+        {%- endif -%}
+        {%- if salesOrder -%}
+            <DatiOrdineAcquisto>
+              <RiferimentoNumeroLinea>{{ loop.index }}</RiferimentoNumeroLinea>
+              <IdDocumento>{{ salesOrder.po_no }}</IdDocumento>
+              <Data>{{ salesOrder.po_date }}</Data>
+              {%- if salesOrder.custom_codice_commessa %}
+                  <CodiceCommessaConvenzione>#{{ salesOrder.custom_codice_commessa }}#</CodiceCommessaConvenzione>
+              {%- endif %}
+              {%- if salesOrder.custom_cig %}
+                  <CodiceCIG>{{ salesOrder.custom_cig }}</CodiceCIG>
+              {%- endif %}
+            </DatiOrdineAcquisto>        
+        {%- endif -%}
+      {%- endfor %}
+{%- endmacro %}
+
 {%- macro render_address(address) %}
 <Indirizzo>{{ address.address_line1 }}</Indirizzo>
 <CAP>{{ address.pincode }}</CAP>
@@ -149,12 +170,7 @@
         <ImportoTotaleDocumento>{{ format_float(doc.rounded_total or doc.grand_total) }}</ImportoTotaleDocumento>
         <Causale>VENDITA</Causale>
       </DatiGeneraliDocumento>
-      {%- for po_no, po_date in doc.customer_po_data.items() %}
-        <DatiOrdineAcquisto>
-            <IdDocumento>{{ po_no }}</IdDocumento>
-            <Data>{{ po_date }}</Data>
-        </DatiOrdineAcquisto>
-      {%- endfor %}
+       {{ render_dati_ordine_acquisto(doc.e_invoice_items) }}
       {%- if doc.is_return and doc.return_against_unamended %}
       <DatiFattureCollegate>
         <IdDocumento>{{ doc.return_against_unamended }}</IdDocumento>
