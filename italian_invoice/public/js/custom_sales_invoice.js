@@ -20,6 +20,13 @@ frappe.ui.form.on("Sales Invoice", {
                 });
             }, __("Fatt. Elettronica"));
         }
-    }
+    },
+    customer: (frm) => {
+        if(frm.doc.customer) {
+            frappe.db.get_value("Customer", frm.doc.customer, "custom_tipo_fattura_elettronica").then(r => {
+                frm.set_value("custom_tipo_di_documento", r.message.custom_tipo_fattura_elettronica);
+            });
+        }
+    },
 });
 
