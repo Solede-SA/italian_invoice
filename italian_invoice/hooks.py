@@ -230,3 +230,57 @@ app_license = "mit"
 doctype_js = {
     "Sales Invoice": "public/js/custom_sales_invoice.js",
 }
+
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "module",
+                "in",
+                [
+                    "italian_invoice",
+                ],
+            ],
+        ],
+    },
+    {
+        "dt": "Workspace",
+        "filters": [
+            [
+                "module",
+                "in",
+                [
+                    "italian_invoice",
+                ],
+            ],
+        ],
+    },
+    {
+        "dt": "Print Format",
+        "filters": [
+            [
+                "module",
+                "in",
+                [
+                    "italian_invoice",
+                ],
+            ],
+        ],
+    },
+    {
+        "dt": "Web Form",
+        "filters": [
+            [
+                "module",
+                "in",
+                [
+                    "italian_invoice",
+                ],
+            ],
+        ],
+    },
+    {
+        "dt": "Property Setter",
+    },
+]
