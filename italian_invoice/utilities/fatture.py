@@ -449,17 +449,17 @@ def prepare_and_attach_invoice(doc, replace=False):
 
 
 @frappe.whitelist()
-def generate_single_invoice(docname):
-    doc = frappe.get_doc("Sales Invoice", docname)
-    frappe.has_permission("Sales Invoice", doc=doc, throw=True)
+def generate_single_invoice(docname, doctype):
+    doc = frappe.get_doc(doctype, docname)
+    frappe.has_permission(doctype, doc=doc, throw=True)
 
     e_invoice = prepare_and_attach_invoice(doc, True)
     return e_invoice
 
 
 @frappe.whitelist()
-def validate_invoice(docname):
-    e_invoice_fileDoc = generate_single_invoice(docname)
+def validate_invoice(docname, doctype):
+    e_invoice_fileDoc = generate_single_invoice(docname, doctype)
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
     xsd_file = frappe.get_app_path("italian_invoice", "utilities/schema_vfpr12.xsd")
 

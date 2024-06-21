@@ -6,7 +6,8 @@ frappe.ui.form.on("Purchase Invoice", {
                 frm.call({
                     method: "italian_invoice.utilities.fatture.validate_invoice",
                     args: {
-                        docname: frm.doc.name
+                        docname: frm.doc.name,
+                        doctype: "Purchase Invoice"
                     },
                     callback: function(r) {
                         frm.reload_doc();
