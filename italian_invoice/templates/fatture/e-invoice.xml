@@ -24,7 +24,7 @@
               {%- if salesOrder.custom_cig %}
                   <CodiceCIG>{{ salesOrder.custom_cig }}</CodiceCIG>
               {%- endif %}
-            </DatiOrdineAcquisto>        
+            </DatiOrdineAcquisto>
         {%- endif -%}
       {%- endfor %}
 {%- endmacro %}
@@ -92,7 +92,9 @@
         <Anagrafica>
           <Denominazione>{{ doc.company }}</Denominazione>
         </Anagrafica>
-        <RegimeFiscale>{{ doc.company_fiscal_regime.split("-")[0] }}</RegimeFiscale>
+        {%- if doc.company_fiscal_code %}
+            <RegimeFiscale>{{ doc.company_fiscal_regime.split("-")[0] }}</RegimeFiscale>
+        {%- endif %}
       </DatiAnagrafici>
       <Sede>
       {{ render_address(doc.company_address_data) }}

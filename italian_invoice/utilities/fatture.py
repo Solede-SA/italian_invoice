@@ -10,6 +10,38 @@ from xmlschema import validate
 from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from erpnext.regional.italy import state_codes
 
+def get_cessionario_committente(doc):
+    doctype = doc.doctype
+
+    if doctype == "Sales Invoice":
+        return frappe.get_doc("Customer", doc.customer, as_dict=True)
+    elif doctype == "Purchase Invoice":
+        return frappe.get_doc("Company", doc.company, as_dict=True)
+
+def get_cedente_prestatore(doc):
+    doctype = doc.doctype
+    if doctype == "Sales Invoice":
+        return frappe.get_doc("Company", doc.company, as_dict=True)
+    elif doctype == "Purchase Invoice":
+        return frappe.get_doc("Supplier", doc.supplier, as_dict=True)
+
+
+def get_billing_address(doc):
+    if doc.doctype == "Customer":
+        return frappe.get_doc("Address", doc.customer_primary_address)
+
+    if doc.doctype == "Supplier":
+        return frappe.get_doc("Address", doc.supplier_primary_address)
+
+    if doc.doctype == "Company":
+        address = frappe.db.get_values ('Address', {
+            'is_primary_address': 1,
+            'is_your_company_address':1
+
+        }, ['*'], as_dict=True)
+
+        return address[0]
+
 
 def update_itemised_tax_data(doc):
     if not doc.taxes:
@@ -59,39 +91,32 @@ def export_invoices(filters=None):
 
 
 def prepare_invoice(invoice, progressive_number):
-    # set company information
-    company = frappe.get_doc("Company", invoice.company)
+    # set CEDENTE information
+    cedente = get_cedente_prestatore(invoice)
+    cedenteAddress = get_billing_address (cedente)
 
     invoice.progressive_number = progressive_number
     invoice.unamended_name = get_unamended_name(invoice)
-    invoice.company_data = company
-    company_address = frappe.get_doc("Address", invoice.company_address)
-    invoice.company_address_data = company_address
+    invoice.company_data = cedente
+    invoice.company_address_data = cedenteAddress
+    invoice.type_of_document = invoice.custom_tipo_di_documento
 
-    # Set invoice type
-    if not invoice.type_of_document:
-        if invoice.is_return and invoice.return_against:
-            invoice.type_of_document = "TD04"  # Credit Note (Nota di Credito)
-            invoice.return_against_unamended = get_unamended_name(
-                frappe.get_doc("Sales Invoice", invoice.return_against)
+    # # set cessionario information
+    cessionario = get_cessionario_committente(invoice)
+    cessionarioAddress = get_billing_address(cessionario)
+    invoice.customer_data = cessionario
+    invoice.customer_address_data = cessionarioAddress
+
+    if invoice.doctype == "Sales Invoice":
+        if invoice.shipping_address_name:
+            invoice.shipping_address_data = frappe.get_doc(
+                "Address", invoice.shipping_address_name
             )
+
+        if invoice.customer_data.is_public_administration:
+            invoice.transmission_format_code = "FPA12"
         else:
-            invoice.type_of_document = "TD01"  # Sales Invoice (Fattura)
-
-    # set customer information
-    invoice.customer_data = frappe.get_doc("Customer", invoice.customer)
-    customer_address = frappe.get_doc("Address", invoice.customer_address)
-    invoice.customer_address_data = customer_address
-
-    if invoice.shipping_address_name:
-        invoice.shipping_address_data = frappe.get_doc(
-            "Address", invoice.shipping_address_name
-        )
-
-    if invoice.customer_data.is_public_administration:
-        invoice.transmission_format_code = "FPA12"
-    else:
-        invoice.transmission_format_code = "FPR12"
+            invoice.transmission_format_code = "FPR12"
 
     invoice.e_invoice_items = [item for item in invoice.items]
     tax_data = get_invoice_summary(invoice.e_invoice_items, invoice.taxes)
@@ -113,16 +138,17 @@ def prepare_invoice(invoice, progressive_number):
         if item.tax_rate == 0.0 and item.tax_amount == 0.0 and tax_data.get("0.0"):
             item.tax_exemption_reason = tax_data["0.0"]["tax_exemption_reason"]
 
-    customer_po_data = {}
-    for d in invoice.e_invoice_items:
-        if (
-            d.customer_po_no
-            and d.customer_po_date
-            and d.customer_po_no not in customer_po_data
-        ):
-            customer_po_data[d.customer_po_no] = d.customer_po_date
+    if invoice.doctype == "Sales Invoice":
+        customer_po_data = {}
+        for d in invoice.e_invoice_items:
+            if (
+                d.customer_po_no
+                and d.customer_po_date
+                and d.customer_po_no not in customer_po_data
+            ):
+                customer_po_data[d.customer_po_no] = d.customer_po_date
 
-    invoice.customer_po_data = customer_po_data
+        invoice.customer_po_data = customer_po_data
 
     return invoice
 
@@ -282,104 +308,6 @@ def get_invoice_summary(items, taxes):
     return summary_data
 
 
-# Preflight for successful e-invoice export.
-def sales_invoice_validate(doc):
-    # Validate company
-    if doc.doctype != "Sales Invoice":
-        return
-
-    if not doc.company_address:
-        frappe.throw(
-            _("Please set an Address on the Company '%s'" % doc.company),
-            title=_("E-Invoicing Information Missing"),
-        )
-    else:
-        validate_address(doc.company_address)
-
-    company_fiscal_regime = frappe.get_cached_value(
-        "Company", doc.company, "fiscal_regime"
-    )
-    if not company_fiscal_regime:
-        frappe.throw(
-            _(
-                "Fiscal Regime is mandatory, kindly set the fiscal regime in the company {0}"
-            ).format(doc.company)
-        )
-    else:
-        doc.company_fiscal_regime = company_fiscal_regime
-
-    doc.company_tax_id = frappe.get_cached_value("Company", doc.company, "tax_id")
-    doc.company_fiscal_code = frappe.get_cached_value(
-        "Company", doc.company, "fiscal_code"
-    )
-    if not doc.company_tax_id and not doc.company_fiscal_code:
-        frappe.throw(
-            _(
-                "Please set either the Tax ID or Fiscal Code on Company '%s'"
-                % doc.company
-            ),
-            title=_("E-Invoicing Information Missing"),
-        )
-
-    # Validate customer details
-    customer = frappe.get_doc("Customer", doc.customer)
-
-    if customer.customer_type == "Individual":
-        doc.customer_fiscal_code = customer.fiscal_code
-        if not doc.customer_fiscal_code:
-            frappe.throw(
-                _("Please set Fiscal Code for the customer '%s'" % doc.customer),
-                title=_("E-Invoicing Information Missing"),
-            )
-    else:
-        if customer.is_public_administration:
-            doc.customer_fiscal_code = customer.fiscal_code
-            if not doc.customer_fiscal_code:
-                frappe.throw(
-                    _(
-                        "Please set Fiscal Code for the public administration '%s'"
-                        % doc.customer
-                    ),
-                    title=_("E-Invoicing Information Missing"),
-                )
-        else:
-            doc.tax_id = customer.tax_id
-            if not doc.tax_id:
-                frappe.throw(
-                    _("Please set Tax ID for the customer '%s'" % doc.customer),
-                    title=_("E-Invoicing Information Missing"),
-                )
-
-    if not doc.customer_address:
-        frappe.throw(
-            _("Please set the Customer Address"),
-            title=_("E-Invoicing Information Missing"),
-        )
-    else:
-        validate_address(doc.customer_address)
-
-    if not len(doc.taxes):
-        frappe.throw(
-            _("Please set at least one row in the Taxes and Charges Table"),
-            title=_("E-Invoicing Information Missing"),
-        )
-    else:
-        for row in doc.taxes:
-            if row.rate == 0 and row.tax_amount == 0 and not row.tax_exemption_reason:
-                frappe.throw(
-                    _(
-                        "Row {0}: Please set at Tax Exemption Reason in Sales Taxes and Charges"
-                    ).format(row.idx),
-                    title=_("E-Invoicing Information Missing"),
-                )
-
-    for schedule in doc.payment_schedule:
-        if schedule.mode_of_payment and not schedule.mode_of_payment_code:
-            schedule.mode_of_payment_code = frappe.get_cached_value(
-                "Mode of Payment", schedule.mode_of_payment, "mode_of_payment_code"
-            )
-
-
 # Ensure payment details are valid for e-invoice.
 def sales_invoice_on_submit(doc, method):
     # Validate payment details
@@ -452,8 +380,8 @@ def prepare_and_attach_invoice(doc, replace=False):
 def generate_single_invoice(docname, doctype):
     doc = frappe.get_doc(doctype, docname)
     frappe.has_permission(doctype, doc=doc, throw=True)
+    e_invoice = prepare_and_attach_invoice(doc)
 
-    e_invoice = prepare_and_attach_invoice(doc, True)
     return e_invoice
 
 
