@@ -1,0 +1,151 @@
+{% import 'italian_invoice/templates/includes/macros.html' as macros %}<?xml version='1.0' encoding='UTF-8'?>
+<p:FatturaElettronica xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" versione="{{ doc.transmission_format_code }}" xsi:schemaLocation="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2 http://www.fatturapa.gov.it/export/fatturazione/sdi/fatturapa/v1.2/Schema_del_file_xml_FatturaPA_versione_1.2.xsd">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>{{ doc.company_data.country_code }}</IdPaese>
+                <IdCodice>{{ doc.company_data.tax_id | replace("IT","") }}</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>{{ doc.progressive_number }}</ProgressivoInvio>
+            <FormatoTrasmissione>{{ doc.transmission_format_code }}</FormatoTrasmissione>
+            <CodiceDestinatario>{{ doc.cessionario_committente.recipient_code }}</CodiceDestinatario>
+            {% if doc.company_data.contact.phone or doc.company_data.contact.email %}
+                <ContattiTrasmittente>
+                    {% if doc.company_data.contact.phone %}
+                    <Telefono>{{ doc.company_data.contact.phone }}</Telefono>
+                    {% endif %}
+                    {% if doc.company_data.contact.email %}
+                    <Email>{{ doc.company_data.contact.email }}</Email>
+                    {% endif %}
+                </ContattiTrasmittente>
+            {% endif %}
+        </DatiTrasmissione>
+    
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>{{ doc.cedente_prestatore.address.country_code }}</IdPaese>
+                    <IdCodice>{{ doc.cedente_prestatore.tax_id | replace("IT","") }}</IdCodice>
+                </IdFiscaleIVA>
+                {% if doc.cedente_prestatore.fiscal_code %}
+                <CodiceFiscale>{{ doc.cedente_prestatore.fiscal_code }}</CodiceFiscale>
+                {% endif %}
+                <Anagrafica>
+                    <Denominazione>{{ doc.cedente_prestatore.name }}</Denominazione>
+                </Anagrafica>
+                {%- if doc.cedente_prestatore.fiscal_regime %}
+                    <RegimeFiscale>{{ doc.cedente_prestatore.fiscal_regime.split("-")[0] }}</RegimeFiscale>
+                {%else%}
+                    <RegimeFiscale>RF18</RegimeFiscale>
+                {%- endif %}
+            </DatiAnagrafici>
+            <Sede>
+                {{ macros.render_address(doc.cedente_prestatore.address) }}
+            </Sede>
+            {% if doc.cedente_prestatore.doctype == "Company" %}
+                <IscrizioneREA>
+                    <Ufficio>{{ doc.company_data.registration_data.registrar_office_province }}</Ufficio>
+                    <NumeroREA>{{ doc.company_data.registration_data.registration_number }}</NumeroREA>
+                    {% if doc.company_data.registration_data.share_capital_amount %}
+                        <CapitaleSociale>{{ macros.format_float(doc.company_data.registration_data.share_capital_amount) }}</CapitaleSociale>
+                    {% endif %}
+                    {% if doc.company_data.registration_data.no_of_members %}
+                        <SocioUnico>{{ doc.company_data.registration_data.no_of_members.split("-")[0] }}</SocioUnico>
+                    {% endif %}
+                    {% if doc.company_data.registration_data.liquidation_state %}
+                        <StatoLiquidazione>{{ doc.company_data.registration_data.liquidation_state.split("-")[0] }}</StatoLiquidazione>
+                    {% endif %}
+                </IscrizioneREA>
+            {% endif %}
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                {% if doc.cessionario_committente.type == "Individual" %}
+                    <CodiceFiscale>{{ doc.cessionario_committente.fiscal_code }}</CodiceFiscale>
+                    <Anagrafica>
+                        <Nome>{{ doc.cessionario_committente.name.split()[0] }}</Nome>
+                        <Cognome>{{ doc.cessionario_committente.name.split()[1] }}</Cognome>
+                    </Anagrafica>
+                {% else %}
+                    <IdFiscaleIVA>
+                        <IdPaese>{{ doc.cessionario_committente.address.country_code }}</IdPaese>
+                        <IdCodice>{{ doc.cessionario_committente.tax_id | replace("IT","") }}</IdCodice>
+                    </IdFiscaleIVA>
+                    {% if doc.cessionario_committente.fiscal_code %}
+                        <CodiceFiscale>{{ doc.cessionario_committente.fiscal_code }}</CodiceFiscale>
+                    {% endif %}
+                    <Anagrafica>
+                        <Denominazione>{{ doc.cessionario_committente.name }}</Denominazione>
+                    </Anagrafica>
+                {% endif %}
+            </DatiAnagrafici>   
+            <Sede>
+                {{ macros.render_address(doc.cessionario_committente.address) }}
+            </Sede>
+        </CessionarioCommittente>
+    </FatturaElettronicaHeader>
+  
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>{{ doc.type_of_document }}</TipoDocumento>
+                <Divisa>{{ doc.currency }}</Divisa>
+                <Data>{{ doc.posting_date }}</Data>
+                <Numero>{{ doc.unamended_name }}</Numero>
+                <ImportoTotaleDocumento>{{ macros.format_float(doc.rounded_total or doc.grand_total) }}</ImportoTotaleDocumento>
+                <Causale>VENDITA</Causale>
+            </DatiGeneraliDocumento>
+        </DatiGenerali>
+    
+        <DatiBeniServizi>
+            {% for item in doc.e_invoice_items %}
+            <DettaglioLinee>
+                <NumeroLinea>{{ item.idx }}</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>CODICE</CodiceTipo>
+                    <CodiceValore>{{ item.item_code }}</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>{{ html2text(item.description or '') or item.item_name }}</Descrizione>
+                <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
+                <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
+                <PrezzoUnitario>{{ macros.format_float(item.price_list_rate or item.rate) }}</PrezzoUnitario>
+                <PrezzoTotale>{{ macros.format_float(item.amount) }}</PrezzoTotale>
+                <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
+            </DettaglioLinee>
+            {% endfor %}
+            {% for tax, data in doc.tax_data.items() %}
+            <DatiRiepilogo>
+                <AliquotaIVA>{{ macros.format_float(tax|flt) }}</AliquotaIVA>
+                <ImponibileImporto>{{ macros.format_float(data.taxable_amount) }}</ImponibileImporto>
+                <Imposta>{{ macros.format_float(data.tax_amount) }}</Imposta>
+            </DatiRiepilogo>
+            {% endfor %}
+        </DatiBeniServizi>
+    
+        <DatiPagamento>
+            {% if doc.payment_schedule|length > 1 %}
+                <CondizioniPagamento>TP01</CondizioniPagamento>
+            {% else %}
+                <CondizioniPagamento>TP02</CondizioniPagamento>
+            {% endif %}
+            {% for payment_term in doc.payment_schedule %}
+                <DettaglioPagamento>
+                    <ModalitaPagamento>{{ payment_term.mode_of_payment_code.split("-")[0] }}</ModalitaPagamento>
+                    <DataScadenzaPagamento>{{ payment_term.due_date }}</DataScadenzaPagamento>
+                    <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount) }}</ImportoPagamento>
+                    {% if payment_term.bank_account_name %}
+                        <IstitutoFinanziario>{{ payment_term.bank_account_name }}</IstitutoFinanziario>
+                    {% endif %}
+                    {% if payment_term.bank_account_iban %}
+                        <IBAN>{{ payment_term.bank_account_iban }}</IBAN>
+                        <ABI>{{ payment_term.bank_account_iban[5:10] }}</ABI>
+                        <CAB>{{ payment_term.bank_account_iban[10:15] }}</CAB>
+                    {% endif %}
+                    {% if payment_term.bank_account_swift_number %}
+                        <BIC>{{ payment_term.bank_account_swift_number }}</BIC>
+                    {% endif %}
+                </DettaglioPagamento>
+            {% endfor %}
+        </DatiPagamento>
+    </FatturaElettronicaBody>
+</p:FatturaElettronica>

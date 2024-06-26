@@ -240,7 +240,7 @@ fixtures = [
                 "module",
                 "in",
                 [
-                    "italian_invoice",
+                    "Italian Invoice",
                 ],
             ],
         ],
@@ -252,7 +252,7 @@ fixtures = [
                 "module",
                 "in",
                 [
-                    "italian_invoice",
+                    "Italian Invoice",
                 ],
             ],
         ],
@@ -264,7 +264,7 @@ fixtures = [
                 "module",
                 "in",
                 [
-                    "italian_invoice",
+                    "Italian Invoice",
                 ],
             ],
         ],
@@ -276,7 +276,7 @@ fixtures = [
                 "module",
                 "in",
                 [
-                    "italian_invoice",
+                    "Italian Invoice",
                 ],
             ],
         ],
