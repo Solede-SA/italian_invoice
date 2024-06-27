@@ -1,5 +1,5 @@
-{% import 'italian_invoice/templates/includes/macros.html' as macros %}<?xml version='1.0' encoding='UTF-8'?>
-<p:FatturaElettronica xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" versione="{{ doc.transmission_format_code }}" xsi:schemaLocation="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2 http://www.fatturapa.gov.it/export/fatturazione/sdi/fatturapa/v1.2/Schema_del_file_xml_FatturaPA_versione_1.2.xsd">
+{% import 'italian_invoice/templates/includes/macros.html' as macros %}<?xml version="1.0" encoding="UTF-8"?>
+<p:FatturaElettronica SistemaEmittente="SoledeErp" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" versione="{{ doc.transmission_format_code }}" xsi:schemaLocation="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2 http://www.fatturapa.gov.it/export/fatturazione/sdi/fatturapa/v1.2/Schema_del_file_xml_FatturaPA_versione_1.2.xsd">
     <FatturaElettronicaHeader>
         <DatiTrasmissione>
             <IdTrasmittente>
@@ -57,6 +57,13 @@
                     {% endif %}
                 </IscrizioneREA>
             {% endif %}
+            {% if doc.cedente_prestatore.contact.email %}
+                <Contatti>
+                    {% if doc.cedente_prestatore.contact.email %}
+                        <Email>{{ doc.cedente_prestatore.contact.email }}</Email>
+                    {% endif %}
+                </Contatti>
+            {% endif %}
         </CedentePrestatore>
         <CessionarioCommittente>
             <DatiAnagrafici>
@@ -83,6 +90,9 @@
                 {{ macros.render_address(doc.cessionario_committente.address) }}
             </Sede>
         </CessionarioCommittente>
+        {%if doc.soggetto_emittente %}
+            <SoggettoEmittente>{{ doc.soggetto_emittente}}</SoggettoEmittente>
+        {% endif %}
     </FatturaElettronicaHeader>
   
     <FatturaElettronicaBody>
@@ -92,9 +102,24 @@
                 <Divisa>{{ doc.currency }}</Divisa>
                 <Data>{{ doc.posting_date }}</Data>
                 <Numero>{{ doc.unamended_name }}</Numero>
-                <ImportoTotaleDocumento>{{ macros.format_float(doc.rounded_total or doc.grand_total) }}</ImportoTotaleDocumento>
-                <Causale>VENDITA</Causale>
+                <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total) }}</ImportoTotaleDocumento>
+                <Causale>{{ doc.causale }}</Causale>
             </DatiGeneraliDocumento>
+            {%if doc.bill_no %}
+                <DatiFattureCollegate>
+                    <IdDocumento>{{doc.bill_no}}</IdDocumento>
+                    <Data>{{doc.bill_date}}</Data>
+                </DatiFattureCollegate>
+            {%endif%}
+            {%- for row in doc.e_invoice_items %}
+                {%- if row.delivery_note %}
+                <DatiDDT>
+                    <NumeroDDT>{{ row.delivery_note }}</NumeroDDT>
+                    <DataDDT>{{ frappe.db.get_value('Delivery Note', row.delivery_note, 'posting_date') }}</DataDDT>
+                    <RiferimentoNumeroLinea>{{ row.idx }}</RiferimentoNumeroLinea>
+                </DatiDDT>
+                {%- endif %}
+            {%- endfor %}
         </DatiGenerali>
     
         <DatiBeniServizi>
@@ -102,13 +127,13 @@
             <DettaglioLinee>
                 <NumeroLinea>{{ item.idx }}</NumeroLinea>
                 <CodiceArticolo>
-                    <CodiceTipo>CODICE</CodiceTipo>
+                    <CodiceTipo>fornitore</CodiceTipo>
                     <CodiceValore>{{ item.item_code }}</CodiceValore>
                 </CodiceArticolo>
-                <Descrizione>{{ html2text(item.description or '') or item.item_name }}</Descrizione>
+                <Descrizione>{{ item.item_name|lower }}</Descrizione>
                 <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
-                <PrezzoUnitario>{{ macros.format_float(item.price_list_rate or item.rate) }}</PrezzoUnitario>
+                <PrezzoUnitario>{{ macros.format_float(item.rate) }}</PrezzoUnitario>
                 <PrezzoTotale>{{ macros.format_float(item.amount) }}</PrezzoTotale>
                 <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
             </DettaglioLinee>

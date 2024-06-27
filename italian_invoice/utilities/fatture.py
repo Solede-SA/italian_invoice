@@ -16,6 +16,8 @@ def get_billing_address(doc):
     if doc.doctype == "Customer":
         return frappe.get_doc("Address", doc.customer_primary_address)
 
+    print("doc.doctype", doc.doctype)
+
     if doc.doctype == "Supplier":
         return frappe.get_doc("Address", doc.supplier_primary_address)
 
@@ -133,10 +135,15 @@ def get_invoice_data(doc):
     progressive_name, progressive_number = get_progressive_name_and_number(doc)
     e_invoice_items = [item for item in doc.items]
 
+    tipo_di_documento = frappe.get_doc(
+        "Tipologia di documento e-Invoice", doc.custom_tipo_di_documento
+    )
+
     data = {
+        "causale": doc.doctype,
         "transmission_format_code": "FPR12",
         "progressive_number": progressive_number,
-        "type_of_document": doc.custom_tipo_di_documento,
+        "type_of_document": tipo_di_documento.codice,
         "currency": "EUR",
         "posting_date": str(today()),
         "unamended_name": get_unamended_name(doc),
@@ -149,6 +156,12 @@ def get_invoice_data(doc):
         "tax_data": get_invoice_summary(e_invoice_items, doc.taxes),
         "payment_schedule": doc.payment_schedule,
     }
+
+    if doc.doctype == "Purchase Invoice":
+        data["soggetto_emittente"] = "CC"
+        data["bill_no"] = doc.bill_no
+        data["bill_date"] = str(doc.bill_date)
+
     return data
 
 
