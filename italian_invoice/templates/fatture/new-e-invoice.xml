@@ -102,7 +102,23 @@
                 <Divisa>{{ doc.currency }}</Divisa>
                 <Data>{{ doc.posting_date }}</Data>
                 <Numero>{{ doc.unamended_name }}</Numero>
-                <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total) }}</ImportoTotaleDocumento>
+                {%- if doc.stamp_duty %}
+                    <DatiBollo>
+                    <BolloVirtuale>SI</BolloVirtuale>
+                    <ImportoBollo>{{ format_float(doc.stamp_duty) }}</ImportoBollo>
+                </DatiBollo>
+                {%- endif %}
+                {# {%- if doc.discount_amount %}
+                    <ScontoMaggiorazione>
+                        {%- if doc.discount_amount > 0.0 %}
+                            <Tipo>SC</Tipo>
+                        {%- else %}
+                            <Tipo>MG</Tipo>
+                        {%- endif %}
+                        <Importo>{{ macros.format_float(doc.discount_amount|flt) }}</Importo>
+                    </ScontoMaggiorazione>
+                {%- endif %} #}
+                <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total|flt) }}</ImportoTotaleDocumento>
                 <Causale>{{ doc.causale }}</Causale>
             </DatiGeneraliDocumento>
             {%if doc.bill_no %}
@@ -133,8 +149,21 @@
                 <Descrizione>{{ item.item_name|lower }}</Descrizione>
                 <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
-                <PrezzoUnitario>{{ macros.format_float(item.rate) }}</PrezzoUnitario>
-                <PrezzoTotale>{{ macros.format_float(item.amount) }}</PrezzoTotale>
+                <PrezzoUnitario>{{ macros.format_float(item.net_rate) }}</PrezzoUnitario>
+                {# {%- if item.discount_amount %}
+                    <ScontoMaggiorazione>
+                        {%- if item.discount_amount > 0.0 %}
+                            <Tipo>SC</Tipo>
+                        {%- else %}
+                            <Tipo>MG</Tipo>
+                        {%- endif %}
+                        {%- if item.discount_percentage > 0.0 %}
+                            <Percentuale>{{ macros.format_float(item.discount_percentage|flt) }}</Percentuale>
+                        {%- endif %}
+                        <Importo>{{ macros.format_float(item.discount_amount|flt) }}</Importo>
+                    </ScontoMaggiorazione>
+                {%- endif %} #}
+                <PrezzoTotale>{{ macros.format_float(item.net_amount) }}</PrezzoTotale>
                 <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
             </DettaglioLinee>
             {% endfor %}

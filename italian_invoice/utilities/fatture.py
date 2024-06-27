@@ -147,14 +147,20 @@ def get_invoice_data(doc):
         "currency": "EUR",
         "posting_date": str(today()),
         "unamended_name": get_unamended_name(doc),
-        "rounded_total": doc.rounded_total,
         "grand_total": doc.grand_total,
+        "rounded_total": doc.rounded_total,
+        "additional_discount_percentage": doc.additional_discount_percentage,
+        "discount_amount": doc.discount_amount,
+        "net_total": doc.net_total,
+        "total_taxes_and_charges": doc.total_taxes_and_charges,
         "company_data": company_data,
         "cessionario_committente": cessionario_committente,
         "cedente_prestatore": cedente_prestatore,
         "e_invoice_items": e_invoice_items,
         "tax_data": get_invoice_summary(e_invoice_items, doc.taxes),
         "payment_schedule": doc.payment_schedule,
+        "apply_discount_on": doc.apply_discount_on,
+        # "stamp_duty": doc.stamp_duty,
     }
 
     if doc.doctype == "Purchase Invoice":
