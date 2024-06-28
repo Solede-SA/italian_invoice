@@ -94,7 +94,7 @@
             <SoggettoEmittente>{{ doc.soggetto_emittente}}</SoggettoEmittente>
         {% endif %}
     </FatturaElettronicaHeader>
-  
+
     <FatturaElettronicaBody>
         <DatiGenerali>
             <DatiGeneraliDocumento>

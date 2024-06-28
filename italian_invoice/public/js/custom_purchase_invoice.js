@@ -1,6 +1,5 @@
 frappe.ui.form.on("Purchase Invoice", {
   refresh: (frm) => {
-    frm.remove_custom_button("Generate E-Invoice");
     if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
       frm.add_custom_button(
         __("Scarica XML"),

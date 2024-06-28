@@ -1,5 +1,6 @@
 import io
 import json
+import re
 
 import frappe
 from frappe import _
@@ -12,11 +13,23 @@ from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from erpnext.regional.italy import state_codes
 
 
+def get_prefixed_company_tax_id(company_tax_id):
+    return company_tax_id if company_tax_id.startswith("IT") else "IT" + company_tax_id
+
+
+def clean_phone(s):
+    # Rimuove le parentesi mantenendo gli spazi
+    s = re.sub(r"[()]", "", s)
+    # Rimuove i numeri tra + e il primo spazio successivo
+    s = re.sub(r"\+\d+\s", "", s)
+    # Rimuove tutti i caratteri non numerici
+    s = re.sub(r"\D", "", s)
+    return s
+
+
 def get_billing_address(doc):
     if doc.doctype == "Customer":
         return frappe.get_doc("Address", doc.customer_primary_address)
-
-    print("doc.doctype", doc.doctype)
 
     if doc.doctype == "Supplier":
         return frappe.get_doc("Address", doc.supplier_primary_address)
@@ -42,7 +55,7 @@ def get_company_data(doc):
         "fiscal_code": company.fiscal_code,
         "fiscal_regime": company.fiscal_regime,
         "contact": {
-            "phone": company.phone_no,
+            "phone": clean_phone(company.phone_no),
             "email": company.email,
         },
         "registration_data": {
@@ -75,6 +88,20 @@ def get_codice_destinatario(party):
     return codice_destinatario
 
 
+def get_party_name(party):
+    name = None
+    if party.doctype == "Company":
+        name = party.company_name
+
+    if party.doctype == "Customer":
+        name = party.customer_name
+
+    if party.doctype == "Supplier":
+        name = party.supplier_name
+
+    return name
+
+
 def get_party_data(party):
     billing_address = get_billing_address(party)
 
@@ -83,7 +110,7 @@ def get_party_data(party):
         "fiscal_code": party.fiscal_code,
         "tax_id": party.tax_id,
         "recipient_code": get_codice_destinatario(party),
-        "name": party.name,
+        "name": get_party_name(party),
         "type": "Company" if party.tax_id else "Individual",
         "fiscal_regime": party.fiscal_regime if party.doctype == "Company" else None,
         "address": {
@@ -94,7 +121,7 @@ def get_party_data(party):
             "country_code": billing_address.country_code,
         },
         "contact": {
-            "phone": billing_address.phone,
+            "phone": clean_phone(billing_address.phone),
             "email": billing_address.email_id,
         },
     }
@@ -132,7 +159,6 @@ def get_invoice_data(doc):
     company_data = get_company_data(doc)
     cessionario_committente = get_cessionario_committente(doc)
     cedente_prestatore = get_cedente_prestatore(doc)
-    progressive_name, progressive_number = get_progressive_name_and_number(doc)
     e_invoice_items = [item for item in doc.items]
 
     tipo_di_documento = frappe.get_doc(
@@ -142,7 +168,7 @@ def get_invoice_data(doc):
     data = {
         "causale": doc.doctype,
         "transmission_format_code": "FPR12",
-        "progressive_number": progressive_number,
+        "progressive_number": get_progressive_name(doc),
         "type_of_document": tipo_di_documento.codice,
         "currency": "EUR",
         "posting_date": str(today()),
@@ -504,23 +530,14 @@ def get_invoice_summary(items, taxes):
 
 def get_e_invoice_attachments(doc):
     company_data = get_company_data(doc)
-    invoices = [doc]
-
-    tax_id_map = {
-        invoice.name: (
-            company_data["tax_id"]
-            if company_data["tax_id"].startswith("IT")
-            else "IT" + company_data["tax_id"]
-        )
-        for invoice in invoices
-    }
+    company_tax_id = get_prefixed_company_tax_id(company_data["tax_id"])
 
     attachments = frappe.get_all(
         "File",
         fields=("name", "file_name", "attached_to_name", "is_private"),
         filters={
-            "attached_to_name": ("in", tax_id_map),
-            "attached_to_doctype": "Sales Invoice",
+            "attached_to_name": doc.name,
+            "attached_to_doctype": doc.doctype,
         },
     )
 
@@ -529,9 +546,7 @@ def get_e_invoice_attachments(doc):
         if (
             attachment.file_name
             and attachment.file_name.endswith(".xml")
-            and attachment.file_name.startswith(
-                tax_id_map.get(attachment.attached_to_name)
-            )
+            and attachment.file_name.startswith(company_tax_id)
         ):
             out.append(attachment)
 
@@ -558,10 +573,17 @@ def get_unamended_name(doc):
         if not hasattr(doc, attribute):
             return doc.name
 
+    unamended_name = doc.name
+
     if doc.amended_from:
-        return "-".join(doc.name.split("-")[:-1])
-    else:
-        return doc.name
+        unamended_name = doc.amended_from.split("-")[0]
+
+    return unamended_name
+
+
+def get_progressive_name(doc):
+    name = get_unamended_name(doc)
+    return name.split("/")[-1]
 
 
 # def set_state_code(doc, method):
@@ -585,33 +607,47 @@ def get_unamended_name(doc):
 #         doc.state_code = state_codes_lower.get(state)
 
 
-def get_progressive_name_and_number(doc, replace=False):
+# def get_progressive_name_and_number(doc, replace=False):
+#     company_data = get_company_data(doc)
+#     if replace:
+#         for attachment in get_e_invoice_attachments(doc):
+#             remove_file(
+#                 attachment.name,
+#                 attached_to_doctype=doc.doctype,
+#                 attached_to_name=doc.name,
+#             )
+#             filename = attachment.file_name.split(".xml")[0]
+#             return filename, filename.split("_")[1]
+
+#     company_tax_id = (
+#         company_data["tax_id"]
+#         if company_data["tax_id"].startswith("IT")
+#         else "IT" + company_data["tax_id"]
+#     )
+#     progressive_name = frappe.model.naming.make_autoname(company_tax_id + "_.#####")
+#     progressive_number = progressive_name.split("_")[1]
+
+#     return progressive_name, progressive_number
+
+
+def get_e_invoice_file_name(doc):
     company_data = get_company_data(doc)
-    if replace:
-        for attachment in get_e_invoice_attachments(doc):
-            remove_file(
-                attachment.name,
-                attached_to_doctype=doc.doctype,
-                attached_to_name=doc.name,
-            )
-            filename = attachment.file_name.split(".xml")[0]
-            return filename, filename.split("_")[1]
-
-    company_tax_id = (
-        company_data["tax_id"]
-        if company_data["tax_id"].startswith("IT")
-        else "IT" + company_data["tax_id"]
-    )
-    progressive_name = frappe.model.naming.make_autoname(company_tax_id + "_.#####")
-    progressive_number = progressive_name.split("_")[1]
-
-    return progressive_name, progressive_number
+    company_tax_id = get_prefixed_company_tax_id(company_data["tax_id"])
+    invoice_number = get_progressive_name(doc)
+    return company_tax_id + "_" + invoice_number + ".xml"
 
 
-def prepare_and_attach_invoice(doc, replace=False):
+def remove_e_invoice_attachments(doc):
+    for attachment in get_e_invoice_attachments(doc):
+        remove_file(
+            attachment.name, attached_to_doctype=doc.doctype, attached_to_name=doc.name
+        )
+
+
+def prepare_and_attach_invoice(doc):
+    remove_e_invoice_attachments(doc)
     invoice = get_invoice_data(doc)
-    print("invoice", invoice)
-    progressive_name, progressive_number = get_progressive_name_and_number(doc, replace)
+    xml_filename = get_e_invoice_file_name(doc)
 
     invoice_xml = frappe.render_template(
         "italian_invoice/templates/fatture/new-e-invoice.xml",
@@ -620,8 +656,6 @@ def prepare_and_attach_invoice(doc, replace=False):
     )
 
     invoice_xml = invoice_xml.replace("&", "&amp;")
-
-    xml_filename = progressive_name + ".xml"
 
     _file = frappe.get_doc(
         {
@@ -641,11 +675,10 @@ def prepare_and_attach_invoice(doc, replace=False):
 def validate_invoice(docname, doctype):
     doc = frappe.get_doc(doctype, docname)
     frappe.has_permission(doctype, doc=doc, throw=True)
-    e_invoice_fileDoc = prepare_and_attach_invoice(doc, replace=True)
+
+    e_invoice_fileDoc = prepare_and_attach_invoice(doc)
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
     xsd_file = frappe.get_app_path("italian_invoice", "utilities/schema_vfpr12.xsd")
-
-    print("xml_file", xml_file)
 
     try:
         validate(xml_file, xsd_file)
