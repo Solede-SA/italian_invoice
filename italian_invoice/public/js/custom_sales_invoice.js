@@ -24,6 +24,27 @@ frappe.ui.form.on("Sales Invoice", {
         },
         __("Fatt. Elettronica"),
       );
+   }
+    
+  },
+  onload_post_render: (frm) => {
+    if (frm.doc.is_return) {
+      frm.set_value("custom_tipo_di_documento", "TD04");
+      frm.set_value("naming_series", "NCRED/.YY./");
+    }
+      
+    
+  },
+  is_return: (frm) => {
+    if (frm.doc.is_return) {
+      frm.set_value("custom_tipo_di_documento", "TD04");
+      frm.set_value("naming_series", "NCRED/.YY./");
+    }
+      
+  },
+  is_debit_note : (frm) => {
+    if (frm.doc.is_debit_note){
+      frm.set_value("custom_tipo_di_documento", "TD05");
     }
   },
   customer: (frm) => {
@@ -42,4 +63,10 @@ frappe.ui.form.on("Sales Invoice", {
         });
     }
   },
+  validate : (frm) => {
+    if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04") 
+      frappe.throw(__("Tipo di documento must be TD04 for return invoice"));
+    if (frm.doc.is_debit_note && frm.doc.custom_tipo_di_documento !== "TD05")
+      frappe.throw(__("Tipo di documento must be TD05 for debit note"));
+  }
 });

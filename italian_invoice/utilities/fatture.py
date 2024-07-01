@@ -165,6 +165,9 @@ def get_invoice_data(doc):
         "Tipologia di documento e-Invoice", doc.custom_tipo_di_documento
     )
 
+    if doc.return_against:
+        returned_against_doc = frappe.get_doc("Sales Invoice", doc.return_against)
+
     data = {
         "causale": doc.doctype,
         "transmission_format_code": "FPR12",
@@ -173,6 +176,12 @@ def get_invoice_data(doc):
         "currency": "EUR",
         "posting_date": str(today()),
         "unamended_name": get_unamended_name(doc),
+        "return_against_unamended": (
+            get_unamended_name(returned_against_doc) if doc.return_against else None
+        ),
+        "return_against_date": (
+            returned_against_doc.posting_date if doc.return_against else None
+        ),
         "grand_total": doc.grand_total,
         "rounded_total": doc.rounded_total,
         "additional_discount_percentage": doc.additional_discount_percentage,
@@ -194,6 +203,7 @@ def get_invoice_data(doc):
         data["bill_no"] = doc.bill_no
         data["bill_date"] = str(doc.bill_date)
 
+    print(data)
     return data
 
 

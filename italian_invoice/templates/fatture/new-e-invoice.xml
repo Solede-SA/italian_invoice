@@ -127,6 +127,12 @@
                     <Data>{{doc.bill_date}}</Data>
                 </DatiFattureCollegate>
             {%endif%}
+            {%if doc.return_against_unamended %}
+                <DatiFattureCollegate>
+                    <IdDocumento>{{doc.return_against_unamended}}</IdDocumento>
+                    <Data>{{doc.return_against_date}}</Data>
+                </DatiFattureCollegate>
+            {%endif%}
             {%- for row in doc.e_invoice_items %}
                 {%- if row.delivery_note %}
                 <DatiDDT>
