@@ -27,12 +27,13 @@ def clean_phone(s):
     return s
 
 
-def get_billing_address(doc):
+def get_billing_address(doc, invoice):
+    print(doc.doctype)
     if doc.doctype == "Customer":
-        return frappe.get_doc("Address", doc.customer_primary_address)
+        return frappe.get_doc("Address", invoice.customer_address)
 
     if doc.doctype == "Supplier":
-        return frappe.get_doc("Address", doc.supplier_primary_address)
+        return frappe.get_doc("Address", invoice.supplier_address)
 
     if doc.doctype == "Company":
         address = frappe.db.get_values(
@@ -47,7 +48,7 @@ def get_billing_address(doc):
 
 def get_company_data(doc):
     company = frappe.get_doc("Company", doc.company, as_dict=True)
-    billing_address = get_billing_address(company)
+    billing_address = get_billing_address(company, doc)
 
     company_data = {
         "country_code": "IT",
@@ -102,8 +103,8 @@ def get_party_name(party):
     return name
 
 
-def get_party_data(party):
-    billing_address = get_billing_address(party)
+def get_party_data(party, invoice):
+    billing_address = get_billing_address(party, invoice)
 
     party_data = {
         "doctype": party.doctype,
@@ -138,7 +139,7 @@ def get_cessionario_committente(doc):
     elif doctype == "Purchase Invoice":
         cessionario = frappe.get_doc("Company", doc.company, as_dict=True)
 
-    cessionario_committente = get_party_data(cessionario)
+    cessionario_committente = get_party_data(cessionario, doc)
     return cessionario_committente
 
 
@@ -151,7 +152,7 @@ def get_cedente_prestatore(doc):
     elif doctype == "Purchase Invoice":
         cedente = frappe.get_doc("Supplier", doc.supplier, as_dict=True)
 
-    cedente_prestatore = get_party_data(cedente)
+    cedente_prestatore = get_party_data(cedente, doc)
     return cedente_prestatore
 
 

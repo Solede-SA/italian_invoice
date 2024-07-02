@@ -15,7 +15,9 @@
         {%- endif -%}
         {%- if salesOrder -%}
         <DatiOrdineAcquisto>
-            <RiferimentoNumeroLinea>{{ loop.index }}</RiferimentoNumeroLinea>
+            {%- if items|length > 1 %}
+                <RiferimentoNumeroLinea>{{ loop.index }}</RiferimentoNumeroLinea>
+            {%- endif %}
             <IdDocumento>{{ salesOrder.po_no }}</IdDocumento>
             <Data>{{ salesOrder.po_date }}</Data>
             {%- if salesOrder.custom_codice_commessa %}

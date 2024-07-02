@@ -1,6 +1,7 @@
 frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
     frm.remove_custom_button("Generate E-Invoice");
+    frm.set_df_property('vat_collectability', 'read_only', 0)
    if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
       frm.add_custom_button(
         __("Scarica XML"),
@@ -53,13 +54,13 @@ frappe.ui.form.on("Sales Invoice", {
         .get_value(
           "Customer",
           frm.doc.customer,
-          "custom_tipo_fattura_elettronica",
+          ['custom_tipo_fattura_elettronica', 'custom_vat_collectability'],
         )
         .then((r) => {
-          frm.set_value(
-            "custom_tipo_di_documento",
-            r.message.custom_tipo_fattura_elettronica,
-          );
+          frm.set_value({
+            custom_tipo_di_documento: r.message.custom_tipo_fattura_elettronica,
+            vat_collectability: r.message.custom_vat_collectability
+          })
         });
     }
   },

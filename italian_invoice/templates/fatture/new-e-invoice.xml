@@ -121,6 +121,7 @@
                 <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total|flt) }}</ImportoTotaleDocumento>
                 <Causale>{{ doc.causale }}</Causale>
             </DatiGeneraliDocumento>
+            {{ macros.render_dati_ordine_acquisto(doc.e_invoice_items) }}
             {%if doc.bill_no %}
                 <DatiFattureCollegate>
                     <IdDocumento>{{doc.bill_no}}</IdDocumento>
