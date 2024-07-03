@@ -172,6 +172,9 @@
                 {%- endif %} #}
                 <PrezzoTotale>{{ macros.format_float(item.net_amount) }}</PrezzoTotale>
                 <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
+                {% if item.custom_riferimento_amministrativo  %}
+                    <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>
+                {% endif %}
             </DettaglioLinee>
             {% endfor %}
             {% for tax, data in doc.tax_data.items() %}
