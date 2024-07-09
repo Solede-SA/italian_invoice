@@ -1,5 +1,24 @@
+const getCustomerTipoFatturaElettronica = (frm) => {
+  if (frm.doc.customer) {
+      frappe.db
+        .get_value(
+          "Customer",
+          frm.doc.customer,
+          ['custom_tipo_fattura_elettronica', 'custom_vat_collectability'],
+        )
+        .then((r) => {
+          frm.set_value({
+            custom_tipo_di_documento: r.message.custom_tipo_fattura_elettronica,
+            vat_collectability: r.message.custom_vat_collectability
+          })
+        });
+  }
+}
+
+
 frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
+    getCustomerTipoFatturaElettronica(frm);
     frm.remove_custom_button("Generate E-Invoice");
     frm.set_df_property('vat_collectability', 'read_only', 0)
    if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
@@ -49,20 +68,7 @@ frappe.ui.form.on("Sales Invoice", {
     }
   },
   customer: (frm) => {
-    if (frm.doc.customer) {
-      frappe.db
-        .get_value(
-          "Customer",
-          frm.doc.customer,
-          ['custom_tipo_fattura_elettronica', 'custom_vat_collectability'],
-        )
-        .then((r) => {
-          frm.set_value({
-            custom_tipo_di_documento: r.message.custom_tipo_fattura_elettronica,
-            vat_collectability: r.message.custom_vat_collectability
-          })
-        });
-    }
+    getCustomerTipoFatturaElettronica(frm);
   },
   validate : (frm) => {
     if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04") 
