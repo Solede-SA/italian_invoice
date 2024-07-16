@@ -7,10 +7,15 @@ const getCustomerTipoFatturaElettronica = (frm) => {
           ['custom_tipo_fattura_elettronica', 'custom_vat_collectability'],
         )
         .then((r) => {
-          frm.set_value({
-            custom_tipo_di_documento: r.message.custom_tipo_fattura_elettronica,
-            vat_collectability: r.message.custom_vat_collectability
-          })
+          if (r.message.custom_tipo_fattura_elettronica) {
+            frm.set_value("custom_tipo_di_documento", r.message.custom_tipo_fattura_elettronica);
+          } else {
+            frm.set_value("custom_tipo_di_documento", "TD24");
+          }
+          if (r.message.custom_vat_collectability) {
+            frm.set_value("vat_collectability", r.message.custom_vat_collectability);
+          }
+          
         });
   }
 }
