@@ -50,7 +50,19 @@ frappe.ui.form.on("Sales Invoice", {
         __("Fatt. Elettronica"),
       );
    }
-    
+    if (frm.doc.custom_bank_account === undefined) {
+      frappe.call({
+        method: "italian_invoice.api.company.bank.get_default_bank_account",
+        args: {
+          "company": frm.doc.company,
+        },
+        callback: function (r) {
+          if (r.message) {
+            frm.set_value("custom_bank_account", r.message.name);
+          }
+        }
+      })
+    }
   },
   onload_post_render: (frm) => {
     if (frm.doc.is_return) {
