@@ -170,7 +170,7 @@
                         <Importo>{{ macros.format_float(item.discount_amount|flt) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
-                <PrezzoTotale>{{ macros.format_float(item.net_amount) }}</PrezzoTotale>
+                <PrezzoTotale>{{ macros.format_float(item.amount) }}</PrezzoTotale>
                 <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
                 {% if item.custom_riferimento_amministrativo  %}
                     <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>
