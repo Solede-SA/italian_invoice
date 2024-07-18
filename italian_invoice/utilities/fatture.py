@@ -84,7 +84,7 @@ def get_codice_destinatario(party):
         codice_destinatario = party.custom_codice_sistema_interscambio
 
     if party.doctype == "Customer":
-        codice_destinatario = party.recipient_code
+        codice_destinatario = party.custom_codice_univoco
 
     return codice_destinatario
 
