@@ -156,7 +156,7 @@
                 <Descrizione>{{ item.item_name|lower }}</Descrizione>
                 <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
-                <PrezzoUnitario>{{ macros.format_float(item.net_rate) }}</PrezzoUnitario>
+                <PrezzoUnitario>{{ macros.format_float(item.rate) }}</PrezzoUnitario>
                 {# {%- if item.discount_amount %}
                     <ScontoMaggiorazione>
                         {%- if item.discount_amount > 0.0 %}
