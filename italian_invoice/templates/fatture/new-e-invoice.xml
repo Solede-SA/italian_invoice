@@ -156,7 +156,7 @@
                 <Descrizione>{{ item.item_name|lower }}</Descrizione>
                 <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
-                <PrezzoUnitario>{{ macros.format_float(item.net_rate) }}</PrezzoUnitario>
+                <PrezzoUnitario>{{ macros.format_float(item.net_rate, 3) }}</PrezzoUnitario>
                 {# {%- if item.discount_amount %}
                     <ScontoMaggiorazione>
                         {%- if item.discount_amount > 0.0 %}
@@ -170,7 +170,7 @@
                         <Importo>{{ macros.format_float(item.discount_amount|flt) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
-                <PrezzoTotale>{{ macros.format_float(item.net_amount) }}</PrezzoTotale>
+                <PrezzoTotale>{{ macros.format_float(item.net_amount, 3) }}</PrezzoTotale>
                 <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
                 {% if item.custom_riferimento_amministrativo  %}
                     <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>
