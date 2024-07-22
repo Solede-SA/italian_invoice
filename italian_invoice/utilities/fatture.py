@@ -18,6 +18,8 @@ def get_prefixed_company_tax_id(company_tax_id):
 
 
 def clean_phone(s):
+    if s is None:
+        return s
     # Rimuove le parentesi mantenendo gli spazi
     s = re.sub(r"[()]", "", s)
     # Rimuove i numeri tra + e il primo spazio successivo
@@ -28,7 +30,6 @@ def clean_phone(s):
 
 
 def get_billing_address(doc, invoice):
-    print(doc.doctype)
     if doc.doctype == "Customer":
         return frappe.get_doc("Address", invoice.customer_address)
 
@@ -211,7 +212,6 @@ def get_invoice_data(doc):
         data["bill_no"] = doc.bill_no
         data["bill_date"] = str(doc.bill_date)
 
-    print(data)
     return data
 
 
