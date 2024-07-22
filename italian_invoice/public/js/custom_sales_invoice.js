@@ -4,7 +4,7 @@ const getCustomerTipoFatturaElettronica = (frm) => {
         .get_value(
           "Customer",
           frm.doc.customer,
-          ['custom_tipo_fattura_elettronica', 'custom_vat_collectability'],
+          ['custom_tipo_fattura_elettronica', 'custom_vat_collectability', 'custom_codice_univoco', 'is_public_administration'],
         )
         .then((r) => {
           if (r.message.custom_tipo_fattura_elettronica) {
@@ -14,6 +14,10 @@ const getCustomerTipoFatturaElettronica = (frm) => {
           }
           if (r.message.custom_vat_collectability) {
             frm.set_value("vat_collectability", r.message.custom_vat_collectability);
+          }
+
+          if (r.message.is_public_administration) {
+            frm.set_value("vat_collectability", 'S-Scissione dei Pagamenti');
           }
           
         });

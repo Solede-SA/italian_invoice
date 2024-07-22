@@ -114,6 +114,9 @@ def get_party_data(party, invoice):
         "name": get_party_name(party),
         "type": "Company" if party.tax_id else "Individual",
         "fiscal_regime": party.fiscal_regime if party.doctype == "Company" else None,
+        "is_public_administration": (
+            party.is_public_administration if party.doctype == "Customer" else None
+        ),
         "address": {
             "address_line1": billing_address.address_line1,
             "pincode": billing_address.pincode,
@@ -169,9 +172,13 @@ def get_invoice_data(doc):
     if doc.return_against:
         returned_against_doc = frappe.get_doc("Sales Invoice", doc.return_against)
 
+    transmission_format_code = "FPR12"
+    if cessionario_committente["is_public_administration"] == 1:
+        transmission_format_code = "FPA12"
+
     data = {
         "causale": doc.doctype,
-        "transmission_format_code": "FPR12",
+        "transmission_format_code": transmission_format_code,
         "progressive_number": get_progressive_name(doc),
         "type_of_document": tipo_di_documento.codice,
         "currency": "EUR",
