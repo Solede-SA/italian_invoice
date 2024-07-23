@@ -25,7 +25,9 @@
             <DatiAnagrafici>
                 <IdFiscaleIVA>
                     <IdPaese>{{ doc.cedente_prestatore.address.country_code }}</IdPaese>
-                    <IdCodice>{{ doc.cedente_prestatore.tax_id | replace("IT","") }}</IdCodice>
+                    {% if doc.cedente_prestatore.tax_id %}
+                        <IdCodice>{{ doc.cedente_prestatore.tax_id | replace("IT","") }}</IdCodice>
+                    {% endif %}
                 </IdFiscaleIVA>
                 {% if doc.cedente_prestatore.fiscal_code %}
                 <CodiceFiscale>{{ doc.cedente_prestatore.fiscal_code }}</CodiceFiscale>
