@@ -10,6 +10,8 @@
     {%- for item in items %}
         {%- if item.sales_order -%}
             {%- set salesOrder = frappe.get_doc('Sales Order', item.sales_order) -%}
+        {%- else -%}
+            {%- set salesOrder = None -%}
         {%- endif -%}
         {%- if salesOrder -%}
         <DatiOrdineAcquisto>

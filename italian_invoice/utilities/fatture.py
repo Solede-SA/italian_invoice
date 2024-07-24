@@ -449,32 +449,34 @@ def get_invoice_summary(items, taxes):
                 )
 
         else:
-            item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
-            for rate_item in [
-                tax_item
-                for tax_item in item_wise_tax_detail.items()
-                if tax_item[1][0] == tax.rate
-            ]:
-                key = cstr(tax.rate)
-                if not summary_data.get(key):
-                    summary_data.setdefault(
-                        key, {"tax_amount": 0.0, "taxable_amount": 0.0}
-                    )
-                summary_data[key]["tax_amount"] += rate_item[1][1]
-                summary_data[key]["taxable_amount"] += sum(
-                    [
-                        item.net_amount
-                        for item in items
-                        if item.item_code == rate_item[0]
-                    ]
-                )
-
-            for item in items:
-                key = cstr(tax.rate)
-                if item.get("charges"):
+            print("add_deduct_tax", tax.add_deduct_tax)
+            if tax.add_deduct_tax == "Add":
+                item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
+                for rate_item in [
+                    tax_item
+                    for tax_item in item_wise_tax_detail.items()
+                    if tax_item[1][0] == tax.rate
+                ]:
+                    key = cstr(tax.rate)
                     if not summary_data.get(key):
-                        summary_data.setdefault(key, {"taxable_amount": 0.0})
-                    summary_data[key]["taxable_amount"] += item.taxable_amount
+                        summary_data.setdefault(
+                            key, {"tax_amount": 0.0, "taxable_amount": 0.0}
+                        )
+                    summary_data[key]["tax_amount"] += rate_item[1][1]
+                    summary_data[key]["taxable_amount"] += sum(
+                        [
+                            item.net_amount
+                            for item in items
+                            if item.item_code == rate_item[0]
+                        ]
+                    )
+
+                for item in items:
+                    key = cstr(tax.rate)
+                    if item.get("charges"):
+                        if not summary_data.get(key):
+                            summary_data.setdefault(key, {"taxable_amount": 0.0})
+                        summary_data[key]["taxable_amount"] += item.taxable_amount
 
     return summary_data
 
