@@ -160,6 +160,15 @@ def get_cedente_prestatore(doc):
     return cedente_prestatore
 
 
+def calculate_grand_total(tax_data):
+    total = 0
+    for key, value in tax_data.items():
+        total += value["tax_amount"]
+        total += value["taxable_amount"]
+
+    return total
+
+
 def get_invoice_data(doc):
     company_data = get_company_data(doc)
     cessionario_committente = get_cessionario_committente(doc)
@@ -177,6 +186,10 @@ def get_invoice_data(doc):
     if cessionario_committente["is_public_administration"] == 1:
         transmission_format_code = "FPA12"
 
+    tax_data = get_invoice_summary(e_invoice_items, doc.taxes)
+
+    grand_total = calculate_grand_total(tax_data)
+
     data = {
         "causale": doc.doctype,
         "transmission_format_code": transmission_format_code,
@@ -191,7 +204,7 @@ def get_invoice_data(doc):
         "return_against_date": (
             returned_against_doc.posting_date if doc.return_against else None
         ),
-        "grand_total": doc.grand_total,
+        "grand_total": grand_total,
         "rounded_total": doc.rounded_total,
         "additional_discount_percentage": doc.additional_discount_percentage,
         "discount_amount": doc.discount_amount,
@@ -201,7 +214,7 @@ def get_invoice_data(doc):
         "cessionario_committente": cessionario_committente,
         "cedente_prestatore": cedente_prestatore,
         "e_invoice_items": e_invoice_items,
-        "tax_data": get_invoice_summary(e_invoice_items, doc.taxes),
+        "tax_data": tax_data,
         "payment_schedule": doc.payment_schedule,
         "apply_discount_on": doc.apply_discount_on,
         # "stamp_duty": doc.stamp_duty,
@@ -367,6 +380,7 @@ def get_invoice_data(doc):
 
 
 def get_invoice_summary(items, taxes):
+    print(taxes)
     summary_data = frappe._dict()
     for tax in taxes:
         # Include only VAT charges.
@@ -426,8 +440,10 @@ def get_invoice_summary(items, taxes):
                     if key == "0.0":
                         summary_data[key][
                             "tax_exemption_reason"
-                        ] = tax.tax_exemption_reason
-                        summary_data[key]["tax_exemption_law"] = tax.tax_exemption_law
+                        ] = tax.custom_motivo_esenzione_iva
+                        summary_data[key][
+                            "tax_exemption_law"
+                        ] = tax.custom_riferimento_normativo
 
             if summary_data.get("0.0") and tax.charge_type in [
                 "On Previous Row Total",
@@ -443,14 +459,19 @@ def get_invoice_summary(items, taxes):
                     {
                         "tax_amount": 0.0,
                         "taxable_amount": tax.total,
-                        "tax_exemption_reason": tax.tax_exemption_reason,
-                        "tax_exemption_law": tax.tax_exemption_law,
+                        "tax_exemption_reason": tax.custom_motivo_esenzione_iva,
+                        "tax_exemption_law": tax.custom_riferimento_normativo,
                     },
                 )
 
         else:
-            print("add_deduct_tax", tax.add_deduct_tax)
-            if tax.add_deduct_tax == "Add":
+            add_deduct_tax = "Add"
+            if hasattr(tax, "add_deduct_tax"):
+                add_deduct_tax = tax.add_deduct_tax
+
+            print("add_deduct_tax", add_deduct_tax)
+
+            if add_deduct_tax == "Add":
                 item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
                 for rate_item in [
                     tax_item

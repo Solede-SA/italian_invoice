@@ -34,7 +34,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-24 20:22:55.546552",
+ "modified": "2024-07-25 06:58:10.113946",
  "modified_by": "Administrator",
  "module": "Italian Invoice",
  "name": "Motivo esenzione IVA",
@@ -56,5 +56,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "descrizione"
 }

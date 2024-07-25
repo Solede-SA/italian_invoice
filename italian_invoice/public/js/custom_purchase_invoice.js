@@ -41,4 +41,34 @@ frappe.ui.form.on("Purchase Invoice", {
         });
     }
   },
+  validate: (frm) => {
+    if (frm.doc.custom_tipo_di_documento == "TD19") {
+      frm.doc.items.forEach((item) => {
+        item.tax_rate = 0;
+        if (!item.custom_motivo_esenzione_iva) {
+          frappe.throw(
+            __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
+          );
+        }
+      })
+    }
+  },
+});
+
+frappe.ui.form.on("Purchase Invoice Item", {
+  item_code: (frm, cdt, cdn) => {
+    const row = locals[cdt][cdn];
+    if (row.item_code) {
+      frappe.db
+        .get_value("Item", row.item_code, "custom_codice_articolo")
+        .then((r) => {
+          frappe.model.set_value(
+            row.doctype,
+            row.name,
+            "custom_codice_articolo",
+            r.message.custom_codice_articolo,
+          );
+        });
+    }
+  },
 });

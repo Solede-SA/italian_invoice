@@ -120,7 +120,7 @@
                         <Importo>{{ macros.format_float(doc.discount_amount|flt) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
-                {# <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total|flt) }}</ImportoTotaleDocumento> #}
+                <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total|flt) }}</ImportoTotaleDocumento>
                 <Causale>{{ doc.causale }}</Causale>
             </DatiGeneraliDocumento>
             {{ macros.render_dati_ordine_acquisto(doc.e_invoice_items) }}
@@ -173,8 +173,18 @@
                     </ScontoMaggiorazione>
                 {%- endif %} #}
                 <PrezzoTotale>{{ macros.format_float(item.net_amount, 3) }}</PrezzoTotale>
-                {% set aliquota_iva = item.tax_rate if item.tax_rate > 0 else 22  %}
-                <AliquotaIVA>{{ macros.format_float(aliquota_iva)}}</AliquotaIVA>
+                {% set aliquota_iva = item.tax_rate  %}
+                {% if doc.type_of_document in ['TD18'] %}
+                    <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
+                {% elif doc.type_of_document in ['TD19']  %}
+                    <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
+                    <Natura>{{ item.custom_motivo_esenzione_iva }}</Natura>
+                {% else %}
+                    <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
+                {% endif %}
+                {%- if item.custom_tax_exemption_reason %}
+                    <Natura>{{ item.custom_tax_exemption_reason }}</Natura>
+                {%- endif %}
                 {% if item.custom_riferimento_amministrativo  %}
                     <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>
                 {% endif %}
@@ -183,6 +193,9 @@
             {% for tax, data in doc.tax_data.items() %}
             <DatiRiepilogo>
                 <AliquotaIVA>{{ macros.format_float(tax|flt) }}</AliquotaIVA>
+                {%- if data.tax_exemption_reason %}
+                    <Natura>{{ data.tax_exemption_reason }}</Natura>
+                {%- endif %}
                 <ImponibileImporto>{{ macros.format_float(data.taxable_amount) }}</ImponibileImporto>
                 <Imposta>{{ macros.format_float(data.tax_amount) }}</Imposta>
                 {%- if data.vat_collectability %}
