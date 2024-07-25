@@ -198,8 +198,8 @@
                 {%- endif %}
                 <ImponibileImporto>{{ macros.format_float(data.taxable_amount) }}</ImponibileImporto>
                 <Imposta>{{ macros.format_float(data.tax_amount) }}</Imposta>
-                {%- if data.vat_collectability %}
-                    <EsigibilitaIVA>{{ doc.vat_collectability.split("-")[0] }}</EsigibilitaIVA>
+                {%- if doc.vat_collectability %}
+                    <EsigibilitaIVA>{{ doc.vat_collectability }}</EsigibilitaIVA>
                 {%- endif %}
                 {%- if data.tax_exemption_law %}
                     <RiferimentoNormativo>{{ data.tax_exemption_law }}</RiferimentoNormativo>
@@ -218,7 +218,11 @@
                 <DettaglioPagamento>
                     <ModalitaPagamento>{{ payment_term.mode_of_payment_code.split("-")[0] }}</ModalitaPagamento>
                     <DataScadenzaPagamento>{{ payment_term.due_date }}</DataScadenzaPagamento>
-                    <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount) }}</ImportoPagamento>
+                    {% if doc.vat_collectability == 'S' %}
+                         <ImportoPagamento>{{ macros.format_float(doc.net_total) }}</ImportoPagamento>
+                    {% else %}
+                        <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount) }}</ImportoPagamento>
+                    {% endif %}
                     {% if payment_term.bank_account_name %}
                         <IstitutoFinanziario>{{ payment_term.bank_account_name }}</IstitutoFinanziario>
                         <IBAN>{{ payment_term.bank_account_iban }}</IBAN>

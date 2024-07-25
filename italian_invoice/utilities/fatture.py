@@ -163,7 +163,17 @@ def get_cedente_prestatore(doc):
 def calculate_grand_total(tax_data):
     total = 0
     for key, value in tax_data.items():
+        # if vat_collectability != "S":
+
         total += value["tax_amount"]
+        total += value["taxable_amount"]
+
+    return total
+
+
+def calculate_net_total(tax_data):
+    total = 0
+    for key, value in tax_data.items():
         total += value["taxable_amount"]
 
     return total
@@ -186,6 +196,7 @@ def get_invoice_data(doc):
     if cessionario_committente["is_public_administration"] == 1:
         transmission_format_code = "FPA12"
 
+    vat_collectability = doc.vat_collectability.split("-")[0]
     tax_data = get_invoice_summary(e_invoice_items, doc.taxes)
 
     grand_total = calculate_grand_total(tax_data)
@@ -215,6 +226,7 @@ def get_invoice_data(doc):
         "cedente_prestatore": cedente_prestatore,
         "e_invoice_items": e_invoice_items,
         "tax_data": tax_data,
+        "vat_collectability": vat_collectability,
         "payment_schedule": doc.payment_schedule,
         "apply_discount_on": doc.apply_discount_on,
         # "stamp_duty": doc.stamp_duty,
