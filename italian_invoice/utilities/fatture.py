@@ -160,13 +160,13 @@ def get_cedente_prestatore(doc):
     return cedente_prestatore
 
 
-def calculate_grand_total(tax_data):
+def calculate_grand_total(tax_data, conversion_rate=1):
     total = 0
     for key, value in tax_data.items():
         # if vat_collectability != "S":
 
         total += value["tax_amount"]
-        total += value["taxable_amount"]
+        total += value["taxable_amount"] * conversion_rate
 
     return total
 
@@ -196,12 +196,19 @@ def get_invoice_data(doc):
     if cessionario_committente["is_public_administration"] == 1:
         transmission_format_code = "FPA12"
 
-    vat_collectability = doc.vat_collectability.split("-")[0]
+    vat_collectability = (
+        doc.vat_collectability.split("-")[0]
+        if hasattr(doc, "vat_collectability")
+        else "I"
+    )
     tax_data = get_invoice_summary(e_invoice_items, doc.taxes)
 
-    grand_total = calculate_grand_total(tax_data)
+    conversion_rate = doc.conversion_rate if hasattr(doc, "conversion_rate") else 1
+
+    grand_total = calculate_grand_total(tax_data, conversion_rate)
 
     data = {
+        "conversion_rate": conversion_rate,
         "causale": doc.doctype,
         "transmission_format_code": transmission_format_code,
         "progressive_number": get_progressive_name(doc),
@@ -236,6 +243,8 @@ def get_invoice_data(doc):
         data["soggetto_emittente"] = "CC"
         data["bill_no"] = doc.bill_no
         data["bill_date"] = str(doc.bill_date)
+
+    print("conversion_rate", data["conversion_rate"])
 
     return data
 
@@ -481,10 +490,9 @@ def get_invoice_summary(items, taxes):
             if hasattr(tax, "add_deduct_tax"):
                 add_deduct_tax = tax.add_deduct_tax
 
-            print("add_deduct_tax", add_deduct_tax)
-
             if add_deduct_tax == "Add":
                 item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
+                print("item_wise_tax_detail", item_wise_tax_detail)
                 for rate_item in [
                     tax_item
                     for tax_item in item_wise_tax_detail.items()

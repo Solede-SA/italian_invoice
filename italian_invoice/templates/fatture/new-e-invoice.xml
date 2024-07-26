@@ -158,7 +158,8 @@
                 <Descrizione>{{ item.item_name|lower }}</Descrizione>
                 <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
-                <PrezzoUnitario>{{ macros.format_float(item.net_rate, 3) }}</PrezzoUnitario>
+                {% set net_rate = item.net_rate*doc.conversion_rate  %}
+                <PrezzoUnitario>{{ macros.format_float(net_rate) }}</PrezzoUnitario>
                 {# {%- if item.discount_amount %}
                     <ScontoMaggiorazione>
                         {%- if item.discount_amount > 0.0 %}
@@ -172,7 +173,7 @@
                         <Importo>{{ macros.format_float(item.discount_amount|flt) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
-                <PrezzoTotale>{{ macros.format_float(item.net_amount, 3) }}</PrezzoTotale>
+                <PrezzoTotale>{{ macros.format_float(net_rate|round(2)*item.qty) }}</PrezzoTotale>
                 {% set aliquota_iva = item.tax_rate  %}
                 {% if doc.type_of_document in ['TD18'] %}
                     <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
@@ -196,7 +197,7 @@
                 {%- if data.tax_exemption_reason %}
                     <Natura>{{ data.tax_exemption_reason }}</Natura>
                 {%- endif %}
-                <ImponibileImporto>{{ macros.format_float(data.taxable_amount) }}</ImponibileImporto>
+                <ImponibileImporto>{{ macros.format_float(data.taxable_amount|round(2)*doc.conversion_rate) }}</ImponibileImporto>
                 <Imposta>{{ macros.format_float(data.tax_amount) }}</Imposta>
                 {%- if doc.vat_collectability %}
                     <EsigibilitaIVA>{{ doc.vat_collectability }}</EsigibilitaIVA>

@@ -1,8 +1,10 @@
-{%- macro format_float(value, precision=2) -%}{%- if frappe.utils.cint(precision) == 3 %}{{ "%.3f" % value|abs }}
+{%- macro format_float(value, precision=2, conversion_rate=1) -%}
+{% set value = (value*conversion_rate)|round(precision) %}
+{%- if frappe.utils.cint(precision) == 3 %}{{ "%.3f" % value|round(precision) }}
 {%- elif frappe.utils.cint(precision) == 4 -%}
-{{ "%.4f" % value|abs }}
+{{ "%.4f" % value|round(precision) }}
 {%- else -%}
-{{ "%.2f" % value|abs }}
+{{ "%.2f" % value|round(precision) }}
 {%- endif %}
 {%- endmacro -%}
 
