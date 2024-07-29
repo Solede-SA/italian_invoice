@@ -151,8 +151,16 @@
             {% for item in doc.e_invoice_items %}
             <DettaglioLinee>
                 <NumeroLinea>{{ item.idx }}</NumeroLinea>
+                
+                    {%- set rdm = frappe.db.get_value("Item", item.item_code, "custom_rdm") -%}
+                    {%- if rdm %}
+                    <CodiceArticolo>
+                        <CodiceTipo>DM1</CodiceTipo>
+                        <CodiceValore>{{ rdm }}</CodiceValore>
+                    </CodiceArticolo>
+                    {%- endif %}
                 <CodiceArticolo>
-                    <CodiceTipo>fornitore</CodiceTipo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
                     <CodiceValore>{{ item.item_code }}</CodiceValore>
                 </CodiceArticolo>
                 <Descrizione>{{ item.item_name|lower }}</Descrizione>
@@ -164,7 +172,7 @@
                     <ScontoMaggiorazione>
                         {%- if item.discount_amount > 0.0 %}
                             <Tipo>SC</Tipo>
-                        {%- else %}
+                        {%- else %  }
                             <Tipo>MG</Tipo>
                         {%- endif %}
                         {%- if item.discount_percentage > 0.0 %}
@@ -188,6 +196,16 @@
                 {%- endif %}
                 {% if item.custom_riferimento_amministrativo  %}
                     <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>
+                {% endif %}
+                {% if item.dn_detail %}
+                    {% set dn_detail = frappe.get_doc("Delivery Note Item", item.dn_detail) %}
+                    {%- if dn_detail %}
+                        {% if dn_detail.serial_and_batch_bundle %}
+                            {{ macros.getLotto (dn_detail.serial_and_batch_bundle, item)  }} 
+                        {% endif %} 
+                    {%- endif %}
+                   
+                    
                 {% endif %}
             </DettaglioLinee>
             {% endfor %}

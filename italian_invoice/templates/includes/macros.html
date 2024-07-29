@@ -42,3 +42,25 @@
 {% endif %}
 <Nazione>{{ address.country_code }}</Nazione>
 {% endmacro %}
+
+{% macro getLotto(serial_and_batch_bundle, item) -%}
+    {%- set bundle = frappe.db.get_value('Serial and Batch Bundle', serial_and_batch_bundle, 'name') -%}
+    {%- if bundle -%}
+        {%- set lotti = frappe.db.get_all('Serial and Batch Entry', filters={'parent': ['=', bundle]}, fields=['batch_no', 'qty'])%}
+        {%- for l in lotti -%}
+            {%- set lotto = frappe.get_doc('Batch', l.batch_no) -%}
+            {%- if lotto.custom_supplier_batch_id !='' -%}
+                {%- set batch_supplier = lotto.custom_supplier_batch_id -%}
+            {%- else -%}
+                {%- set batch_supplier = lotto.name -%}
+            {%- endif -%}
+            <AltriDatiGestionali>
+                <TipoDato>AswLottSca</TipoDato>
+                <RiferimentoTesto>{{ batch_supplier }}</RiferimentoTesto>
+                <RiferimentoNumero>{{ "%.2f" %  l.qty|abs }}</RiferimentoNumero>
+                <RiferimentoData>{{ lotto.expiry_date }}</RiferimentoData>
+            </AltriDatiGestionali>
+            
+        {%- endfor -%}
+    {%- endif -%}
+{%- endmacro %}
