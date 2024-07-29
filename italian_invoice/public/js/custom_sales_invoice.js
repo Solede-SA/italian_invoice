@@ -1,4 +1,12 @@
 const getCustomerTipoFatturaElettronica = (frm) => {
+  if (frm.doc.is_return) {
+    frm.set_value("custom_tipo_di_documento", "TD04");
+    frm.set_value("naming_series", "NCINV/.YY./");
+    return true;
+  }
+  // if (frm.doc.custom_tipo_di_documento) {
+  //   return true;
+  // }
   if (frm.doc.customer) {
       frappe.db
         .get_value(
@@ -18,6 +26,10 @@ const getCustomerTipoFatturaElettronica = (frm) => {
 
           if (r.message.is_public_administration) {
             frm.set_value("vat_collectability", 'S-Scissione dei Pagamenti');
+            if (frm.doc.is_return == 0) {
+              frm.set_value("naming_series", "PAINV/.YY./")
+            }
+            ;
           }
           
           if (r.message.tax_id) {
@@ -33,7 +45,6 @@ const getCustomerTipoFatturaElettronica = (frm) => {
 
 frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
-    getCustomerTipoFatturaElettronica(frm);
     frm.remove_custom_button("Generate E-Invoice");
     frm.set_df_property('vat_collectability', 'read_only', 0)
    if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
@@ -74,18 +85,10 @@ frappe.ui.form.on("Sales Invoice", {
       })
     }
   },
-  onload_post_render: (frm) => {
-    if (frm.doc.is_return) {
-      frm.set_value("custom_tipo_di_documento", "TD04");
-      frm.set_value("naming_series", "NCRED/.YY./");
-    }
-      
-    
-  },
   is_return: (frm) => {
     if (frm.doc.is_return) {
       frm.set_value("custom_tipo_di_documento", "TD04");
-      frm.set_value("naming_series", "NCRED/.YY./");
+      frm.set_value("naming_series", "NCINV/.YY./");
     }
       
   },

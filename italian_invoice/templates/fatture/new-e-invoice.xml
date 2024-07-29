@@ -164,7 +164,7 @@
                     <CodiceValore>{{ item.item_code }}</CodiceValore>
                 </CodiceArticolo>
                 <Descrizione>{{ item.item_name|lower }}</Descrizione>
-                <Quantita>{{ macros.format_float(item.qty) }}</Quantita>
+                <Quantita>{{ macros.format_float(item.qty|abs) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
                 {% set net_rate = item.net_rate*doc.conversion_rate  %}
                 <PrezzoUnitario>{{ macros.format_float(net_rate) }}</PrezzoUnitario>
@@ -181,7 +181,7 @@
                         <Importo>{{ macros.format_float(item.discount_amount|flt) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
-                <PrezzoTotale>{{ macros.format_float(net_rate|round(2)*item.qty) }}</PrezzoTotale>
+                <PrezzoTotale>{{ macros.format_float(net_rate|round(2)*item.qty|abs) }}</PrezzoTotale>
                 {% set aliquota_iva = item.tax_rate  %}
                 {% if doc.type_of_document in ['TD18'] %}
                     <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
