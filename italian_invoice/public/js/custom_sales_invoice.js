@@ -100,6 +100,9 @@ frappe.ui.form.on("Sales Invoice", {
   customer: (frm) => {
     getCustomerTipoFatturaElettronica(frm);
   },
+  onload: (frm) => {
+    getCustomerTipoFatturaElettronica(frm);
+  },
   validate : (frm) => {
     if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04") 
       frappe.throw(__("Tipo di documento must be TD04 for return invoice"));
