@@ -103,10 +103,20 @@ frappe.ui.form.on("Sales Invoice", {
   onload: (frm) => {
     getCustomerTipoFatturaElettronica(frm);
   },
-  validate : (frm) => {
+  validate: (frm) => {
     if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04") 
       frappe.throw(__("Tipo di documento must be TD04 for return invoice"));
     if (frm.doc.is_debit_note && frm.doc.custom_tipo_di_documento !== "TD05")
       frappe.throw(__("Tipo di documento must be TD05 for debit note"));
-  }
+  },
+  before_save: async (frm) => {
+    let responce = await frappe.db.get_value("Customer", frm.doc.customer, ['is_public_administration', 'name']);
+    let customer = responce.message;
+    if (customer.is_public_administration)
+          frm.doc.items.forEach((item, idx) => {
+            if (item.custom_riferimento_amministrativo === undefined) {
+              frappe.throw(__("<b>Riferimento amministrativo</b> mancante nella riga {0}", [idx + 1]));
+            }
+          });
+  },
 });
