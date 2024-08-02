@@ -26,11 +26,16 @@ const getCustomerTipoFatturaElettronica = (frm) => {
 
           if (r.message.is_public_administration) {
             frm.set_value("vat_collectability", 'S-Scissione dei Pagamenti');
-            if (frm.doc.is_return == 0) {
+            if (frm.doc.is_return == 0 && frm.doc.status != 1) {
               frm.set_value("naming_series", "PAINV/.YY./")
             }
             ;
+          } else {
+            if (frm.doc.is_return == 0 && frm.doc.status != 1) {
+              frm.set_value("naming_series", "SINV/.YY./")
+            }
           }
+          
           
           if (r.message.tax_id) {
             frm.set_value("tax_id", r.message.tax_id);
@@ -89,6 +94,9 @@ frappe.ui.form.on("Sales Invoice", {
     if (frm.doc.is_return) {
       frm.set_value("custom_tipo_di_documento", "TD04");
       frm.set_value("naming_series", "NCINV/.YY./");
+    } else {
+      frm.set_value("custom_tipo_di_documento", "TD24");
+      frm.set_value("naming_series", "SINV/.YY./");
     }
       
   },
@@ -112,11 +120,12 @@ frappe.ui.form.on("Sales Invoice", {
   before_save: async (frm) => {
     let responce = await frappe.db.get_value("Customer", frm.doc.customer, ['is_public_administration', 'name']);
     let customer = responce.message;
-    if (customer.is_public_administration)
-          frm.doc.items.forEach((item, idx) => {
+    if (customer.is_public_administration) {
+       frm.doc.items.forEach((item, idx) => {
             if (item.custom_riferimento_amministrativo === undefined) {
               frappe.throw(__("<b>Riferimento amministrativo</b> mancante nella riga {0}", [idx + 1]));
             }
-          });
+        });
+    }
   },
 });
