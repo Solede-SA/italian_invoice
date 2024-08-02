@@ -26,12 +26,12 @@ const getCustomerTipoFatturaElettronica = (frm) => {
 
           if (r.message.is_public_administration) {
             frm.set_value("vat_collectability", 'S-Scissione dei Pagamenti');
-            if (frm.doc.is_return == 0 && frm.doc.status != 1) {
+            if (frm.doc.is_return == 0 && frm.doc.__islocal) {
               frm.set_value("naming_series", "PAINV/.YY./")
             }
             ;
           } else {
-            if (frm.doc.is_return == 0 && frm.doc.status != 1) {
+            if (frm.doc.is_return == 0 && frm.doc.__islocal) {
               frm.set_value("naming_series", "SINV/.YY./")
             }
           }
