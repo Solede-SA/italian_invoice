@@ -232,6 +232,12 @@ doctype_js = {
     "Purchase Invoice": "public/js/custom_purchase_invoice.js",
 }
 
+doc_events = {
+    "Sales Invoice": {
+        "before_save": "italian_invoice.crud_events.sales_invoice.before_save.execute",
+    }
+}
+
 fixtures = [
     {
         "dt": "Custom Field",

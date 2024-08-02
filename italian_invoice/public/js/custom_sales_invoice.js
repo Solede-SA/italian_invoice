@@ -7,7 +7,7 @@ const getCustomerTipoFatturaElettronica = (frm) => {
   // if (frm.doc.custom_tipo_di_documento) {
   //   return true;
   // }
-  if (frm.doc.customer) {
+  if (frm.doc.customer !== undefined) {
       frappe.db
         .get_value(
           "Customer",
