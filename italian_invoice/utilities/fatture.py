@@ -214,7 +214,7 @@ def get_invoice_data(doc):
         "progressive_number": get_progressive_name(doc),
         "type_of_document": tipo_di_documento.codice,
         "currency": "EUR",
-        "posting_date": str(today()),
+        "posting_date": doc.posting_date,
         "unamended_name": get_unamended_name(doc),
         "return_against_unamended": (
             get_unamended_name(returned_against_doc) if doc.return_against else None
