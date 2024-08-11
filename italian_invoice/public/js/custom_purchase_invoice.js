@@ -52,7 +52,7 @@ frappe.ui.form.on("Purchase Invoice", {
     frm.refresh_field("taxes_and_charges");
   },
   validate: (frm) => {
-    if (frm.doc.custom_tipo_di_documento == "TD19") {
+    if (frm.doc.custom_tipo_di_documento == "TD19" || frm.doc.custom_tipo_di_documento == "TD17") {
       frm.doc.items.forEach((item) => {
         item.tax_rate = 0;
         if (!item.custom_motivo_esenzione_iva) {

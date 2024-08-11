@@ -185,7 +185,7 @@
                 {% set aliquota_iva = item.tax_rate  %}
                 {% if doc.type_of_document in ['TD18'] %}
                     <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
-                {% elif doc.type_of_document in ['TD19']  %}
+                {% elif doc.type_of_document in ['TD19', 'TD17']  %}
                     <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
                     <Natura>{{ item.custom_motivo_esenzione_iva }}</Natura>
                 {% else %}
