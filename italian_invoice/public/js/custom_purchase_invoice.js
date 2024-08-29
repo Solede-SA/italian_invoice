@@ -65,20 +65,20 @@ frappe.ui.form.on("Purchase Invoice", {
   },
 });
 
-frappe.ui.form.on("Purchase Invoice Item", {
-  item_code: (frm, cdt, cdn) => {
-    const row = locals[cdt][cdn];
-    if (row.item_code) {
-      frappe.db
-        .get_value("Item", row.item_code, "custom_codice_articolo")
-        .then((r) => {
-          frappe.model.set_value(
-            row.doctype,
-            row.name,
-            "custom_codice_articolo",
-            r.message.custom_codice_articolo,
-          );
-        });
-    }
-  },
-});
+// frappe.ui.form.on("Purchase Invoice Item", {
+//   item_code: (frm, cdt, cdn) => {
+//     const row = locals[cdt][cdn];
+//     if (row.item_code) {
+//       frappe.db
+//         .get_value("Item", row.item_code, "custom_codice_articolo")
+//         .then((r) => {
+//           frappe.model.set_value(
+//             row.doctype,
+//             row.name,
+//             "custom_codice_articolo",
+//             r.message.custom_codice_articolo,
+//           );
+//         });
+//     }
+//   },
+// });

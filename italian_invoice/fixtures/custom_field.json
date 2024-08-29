@@ -286,7 +286,7 @@
   "collapsible": 0,
   "collapsible_depends_on": null,
   "columns": 0,
-  "default": "",
+  "default": "customer.custom_tipo_fattura_elettronica",
   "depends_on": null,
   "description": null,
   "docstatus": 0,
