@@ -1,7 +1,7 @@
 import io
 import json
 import re
-
+import requests
 import frappe
 from frappe import _
 from frappe.utils import cstr, flt
@@ -751,3 +751,17 @@ def validate_invoice(docname, doctype):
         )
 
     return e_invoice_fileDoc.file_url
+
+
+@frappe.whitelist()
+def get_xml(docname, doctype):
+    file_path = validate_invoice(docname, doctype)
+    file_name = file_path.split("/")[-1]
+    full_path = frappe.get_site_path("private", "files", file_name)
+
+    # Leggi il contenuto del file XML
+    with open(full_path, "r", encoding="utf-8") as file:
+        xml_content = file.read()
+
+    print("xml", xml_content)
+    return xml_content
