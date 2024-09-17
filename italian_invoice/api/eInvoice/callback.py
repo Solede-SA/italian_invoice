@@ -9,11 +9,19 @@ def get_data_ok(request):
     data = json.loads(frappe.request.data)
     event = data["event"]
     lista_errori = ""
+    stato = ""
+    doctype = "Sales Invoice"
 
     if event == "customer-notification":
         uuid = data["data"]["notification"]["invoice_uuid"]
         data_notifica = data["data"]["notification"]["created_at"]
         stato = data["data"]["notification"]["type"]
+
+        if stato == "NE":
+            stato = data["data"]["notification"]["message"]["esito_committente"][
+                "esito"
+            ]
+
         # Check if "lista_errori" exists
         lista_errori = data["data"]["notification"]["message"].get("lista_errori", "")
 
@@ -22,11 +30,17 @@ def get_data_ok(request):
         data_notifica = data["data"]["invoice"]["created_at"]
         stato = "Inviata"
 
+    elif event == "legal-storage-receipt":
+        uuid = data["data"]["object_id"]
+        data_notifica = data["data"]["receipt_received_at"]
+        if data["data"]["object_type"] == "supplier invoice":
+            doctype = "Purchase Invoice"
+
     lista_fatture = frappe.get_list(
-        "Sales Invoice", filters={"custom_uuid": uuid}, fields=["name"]
+        doctype, filters={"custom_uuid": uuid}, fields=["name"]
     )
     if len(lista_fatture) > 0:
-        fattura = frappe.get_doc("Sales Invoice", lista_fatture[0]["name"])
+        fattura = frappe.get_doc(doctype, lista_fatture[0]["name"])
 
         data_ok = {
             "doc_fattura": fattura,
@@ -64,6 +78,7 @@ def save_notifica(data_ok):
             "notifica": data_ok["event"],
             "data": formatted_original_data,
             "data_notifica": formatted_data_notifica,
+            "uuid": data_ok["uuid"],
         },
     )
     doc.custom_ultima_notifica = formatted_original_data
@@ -118,5 +133,7 @@ def legal_storage_missing_vat():
 
 @frappe.whitelist(allow_guest=False)
 def legal_storage_receipt():
-    print(frappe.request.data)
+    data_ok = get_data_ok(frappe.request.data)
+    print(data_ok)
+    save_notifica(data_ok)
     return "OK from legal_storage_receipt"
