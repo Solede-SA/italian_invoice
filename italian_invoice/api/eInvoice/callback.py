@@ -58,7 +58,9 @@ def get_data_ok(request):
 
 
 def save_notifica(data_ok):
-    doc = data_ok["doc_fattura"]
+    fattura = data_ok["doc_fattura"]
+    doc = frappe.get_doc("Transazione SDI", fattura.custom_transazione_sdi)
+    print(doc)
     data_notifica_str = data_ok["data_notifica"]
     data_notifica = parse(data_notifica_str)
     # Convertire `data_notifica` in UTC
@@ -72,8 +74,10 @@ def save_notifica(data_ok):
     # Convertire `original_data` in un oggetto Python e poi in una stringa JSON indentata
     formatted_original_data = json.dumps(data_ok["original_data"], indent=2)
 
+    print(data_ok)
+
     doc.append(
-        "custom_notifiche_sdi",
+        "notifiche_sdi",
         {
             "notifica": data_ok["event"],
             "data": formatted_original_data,
@@ -81,8 +85,12 @@ def save_notifica(data_ok):
             "uuid": data_ok["uuid"],
         },
     )
-    doc.custom_ultima_notifica = formatted_original_data
+    doc.ultima_notifica = formatted_original_data
+    doc.stato_invio = data_ok["stato"]
     doc.save()
+
+    fattura.custom_transazione_sdi = doc.name
+    fattura.save()
 
 
 @frappe.whitelist(allow_guest=False)
@@ -94,9 +102,6 @@ def supplier_invoice():
 @frappe.whitelist(allow_guest=False)
 def cutomer_invoice():
     data_ok = get_data_ok(frappe.request.data)
-    data_ok["doc_fattura"].custom_stato_invio = data_ok["stato"]
-    data_ok["doc_fattura"].save()
-
     save_notifica(data_ok)
 
     return "OK from customer_invoice"
@@ -117,9 +122,6 @@ def invoice_status_invoice_error():
 @frappe.whitelist(allow_guest=False)
 def customer_notification():
     data_ok = get_data_ok(frappe.request.data)
-    data_ok["doc_fattura"].custom_stato_invio = data_ok["stato"]
-    data_ok["doc_fattura"].save()
-
     save_notifica(data_ok)
 
     return "OK from customer_notification"
