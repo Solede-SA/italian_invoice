@@ -58,7 +58,9 @@
                 <TipoDato>AswLottSca</TipoDato>
                 <RiferimentoTesto>{{ batch_supplier }}</RiferimentoTesto>
                 <RiferimentoNumero>{{ "%.2f" %  l.qty|abs }}</RiferimentoNumero>
-                <RiferimentoData>{{ lotto.expiry_date }}</RiferimentoData>
+                {%- if lotto.expiry_date -%}
+                    <RiferimentoData>{{ lotto.expiry_date }}</RiferimentoData>
+                {%- endif -%}
             </AltriDatiGestionali>
             
         {%- endfor -%}
