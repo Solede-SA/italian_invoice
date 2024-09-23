@@ -52,6 +52,22 @@ frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
     frm.remove_custom_button("Generate E-Invoice");
     frm.set_df_property('vat_collectability', 'read_only', 0)
+
+    if (frm.doc.taxes) {
+      frm.doc.taxes.forEach((tax, idx) => {
+        console.log(tax.item_wise_tax_detail);
+        const itemWiseTaxDetail = tax.item_wise_tax_detail;
+        Object.keys(itemWiseTaxDetail).forEach((itemCode) => {
+            const taxDetails = itemWiseTaxDetail[itemCode];
+            const taxRate = taxDetails[0]; // First value in the array is the tax rate
+            const item = frm.doc.items.find(i => i.item_code === itemCode);
+            if (item) {
+              item.tax_rate = taxRate;
+            }
+        })
+      });
+    }
+    
    if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
       frm.add_custom_button(
         __("Scarica XML"),
@@ -150,17 +166,5 @@ frappe.ui.form.on("Sales Invoice", {
       });
     }
 
-  },
-  taxes : (frm) => {
-    if (frm.doc.taxes) {
-      frm.doc.taxes.forEach((tax, idx) => {
-        if (tax.rate <= 0 && tax.custom_motivo_esenzione_iva === undefined) {
-          frappe.throw(__("<b>Riferimento normativo</b> mancante nella tassa {0}", [idx + 1]));
-        }
-        if (tax.custom_motivo_esenzione_iva !== undefined) {
-          tax.tax_exemption_reason = "N3-Non Imponibili"
-        }
-      });
-    }
   }
 });
