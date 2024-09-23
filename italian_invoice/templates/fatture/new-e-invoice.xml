@@ -187,12 +187,11 @@
                     <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
                 {% elif doc.type_of_document in ['TD19', 'TD17']  %}
                     <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
-                    <Natura>{{ item.custom_motivo_esenzione_iva }}</Natura>
                 {% else %}
                     <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
                 {% endif %}
-                {%- if item.custom_tax_exemption_reason %}
-                    <Natura>{{ item.custom_tax_exemption_reason }}</Natura>
+                {%- if item.custom_motivo_esenzione_iva %}
+                    <Natura>{{ item.custom_motivo_esenzione_iva }}</Natura>
                 {%- endif %}
                 {% if item.custom_riferimento_amministrativo  %}
                     <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>

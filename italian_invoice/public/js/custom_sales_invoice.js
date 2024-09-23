@@ -127,5 +127,40 @@ frappe.ui.form.on("Sales Invoice", {
             }
         });
     }
+
+    // frm.doc.items.forEach((item) => {
+    //     alert(item.tax_rate);
+    //     if (item.tax_rate == 0 && !item.custom_motivo_esenzione_iva) {
+    //       frappe.throw(
+    //         __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
+    //       );
+    //     }
+    // })
+
+    if (frm.doc.taxes) {
+      frm.doc.taxes.forEach((tax, idx) => {
+        if (tax.rate <= 0 && tax.custom_motivo_esenzione_iva === undefined) {
+          frappe.throw(__("<b>Riferimento normativo</b> mancante nella tassa {0}", [idx + 1]));
+        }
+        if (tax.custom_motivo_esenzione_iva !== undefined) {
+          tax.tax_exemption_reason = "N3-Non Imponibili"
+        }
+
+
+      });
+    }
+
   },
+  taxes : (frm) => {
+    if (frm.doc.taxes) {
+      frm.doc.taxes.forEach((tax, idx) => {
+        if (tax.rate <= 0 && tax.custom_motivo_esenzione_iva === undefined) {
+          frappe.throw(__("<b>Riferimento normativo</b> mancante nella tassa {0}", [idx + 1]));
+        }
+        if (tax.custom_motivo_esenzione_iva !== undefined) {
+          tax.tax_exemption_reason = "N3-Non Imponibili"
+        }
+      });
+    }
+  }
 });

@@ -244,37 +244,35 @@ def get_invoice_data(doc):
         data["bill_no"] = doc.bill_no
         data["bill_date"] = str(doc.bill_date)
 
-    print("conversion_rate", data["conversion_rate"])
-
     return data
 
 
-# def update_itemised_tax_data(doc):
-#     if not doc.taxes:
-#         return
+def update_itemised_tax_data(doc):
+    if not doc.taxes:
+        return
 
-#     if doc.doctype == "Purchase Invoice":
-#         return
+    if doc.doctype == "Purchase Invoice":
+        return
 
-#     itemised_tax = get_itemised_tax(doc.taxes)
+    itemised_tax = get_itemised_tax(doc.taxes)
 
-#     for row in doc.items:
-#         tax_rate = 0.0
-#         if itemised_tax.get(row.item_code):
-#             tax_rate = sum(
-#                 [
-#                     tax.get("tax_rate", 0)
-#                     for d, tax in itemised_tax.get(row.item_code).items()
-#                 ]
-#             )
+    for row in doc.items:
+        tax_rate = 0.0
+        if itemised_tax.get(row.item_code):
+            tax_rate = sum(
+                [
+                    tax.get("tax_rate", 0)
+                    for d, tax in itemised_tax.get(row.item_code).items()
+                ]
+            )
 
-#         row.tax_rate = flt(tax_rate, row.precision("tax_rate"))
-#         row.tax_amount = flt(
-#             (row.net_amount * tax_rate) / 100, row.precision("net_amount")
-#         )
-#         row.total_amount = flt(
-#             (row.net_amount + row.tax_amount), row.precision("total_amount")
-#         )
+        row.tax_rate = flt(tax_rate, row.precision("tax_rate"))
+        row.tax_amount = flt(
+            (row.net_amount * tax_rate) / 100, row.precision("net_amount")
+        )
+        row.total_amount = flt(
+            (row.net_amount + row.tax_amount), row.precision("total_amount")
+        )
 
 
 # @frappe.whitelist()
@@ -401,7 +399,10 @@ def get_invoice_data(doc):
 
 
 def get_invoice_summary(items, taxes):
-    print(taxes)
+
+    for item in items:
+        print("item.tax_rate", item.tax_rate)
+
     summary_data = frappe._dict()
     for tax in taxes:
         # Include only VAT charges.
@@ -519,6 +520,7 @@ def get_invoice_summary(items, taxes):
                             summary_data.setdefault(key, {"taxable_amount": 0.0})
                         summary_data[key]["taxable_amount"] += item.taxable_amount
 
+    print("summary_data", summary_data)
     return summary_data
 
 
