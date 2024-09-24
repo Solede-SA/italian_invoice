@@ -47,26 +47,30 @@ const getCustomerTipoFatturaElettronica = (frm) => {
   }
 }
 
+const updateTaxRate = (frm) => {
+  console.log("frm.doc.taxes", frm.doc.taxes);
+  if (frm.doc.taxes.length > 0) {
+    frm.doc.taxes.forEach((tax, idx) => {
+      console.log("tax", tax);
+      console.log("tax.item_wise_tax_detail", tax.item_wise_tax_detail);
+      let itemWiseTaxDetail = tax.item_wise_tax_detail;
+      Object.keys(itemWiseTaxDetail).forEach((itemCode) => {
+        let taxDetails = itemWiseTaxDetail[itemCode];
+        let taxRate = taxDetails[0]; // First value in the array is the tax rate
+        let item = frm.doc.items.find(i => i.item_code === itemCode);
+        if (item) {
+          item.tax_rate = taxRate;
+        }
+      })
+    });
+  }
+}
+
 
 frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
     frm.remove_custom_button("Generate E-Invoice");
     frm.set_df_property('vat_collectability', 'read_only', 0)
-
-    if (frm.doc.taxes) {
-      frm.doc.taxes.forEach((tax, idx) => {
-        console.log(tax.item_wise_tax_detail);
-        const itemWiseTaxDetail = tax.item_wise_tax_detail;
-        Object.keys(itemWiseTaxDetail).forEach((itemCode) => {
-            const taxDetails = itemWiseTaxDetail[itemCode];
-            const taxRate = taxDetails[0]; // First value in the array is the tax rate
-            const item = frm.doc.items.find(i => i.item_code === itemCode);
-            if (item) {
-              item.tax_rate = taxRate;
-            }
-        })
-      });
-    }
     
    if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
       frm.add_custom_button(
@@ -128,6 +132,7 @@ frappe.ui.form.on("Sales Invoice", {
     getCustomerTipoFatturaElettronica(frm);
   },
   validate: (frm) => {
+    updateTaxRate(frm);
     if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04") 
       frappe.throw(__("Tipo di documento must be TD04 for return invoice"));
     if (frm.doc.is_debit_note && frm.doc.custom_tipo_di_documento !== "TD05")
@@ -144,19 +149,10 @@ frappe.ui.form.on("Sales Invoice", {
         });
     }
 
-    // frm.doc.items.forEach((item) => {
-    //     alert(item.tax_rate);
-    //     if (item.tax_rate == 0 && !item.custom_motivo_esenzione_iva) {
-    //       frappe.throw(
-    //         __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
-    //       );
-    //     }
-    // })
-
     if (frm.doc.taxes) {
       frm.doc.taxes.forEach((tax, idx) => {
-        if (tax.rate <= 0 && tax.custom_motivo_esenzione_iva === undefined) {
-          frappe.throw(__("<b>Riferimento normativo</b> mancante nella tassa {0}", [idx + 1]));
+        if (tax.rate <= 0 && tax.custom_motivo_esenzione_iva === undefined && tax.charge_type !== "Actual") {
+          frappe.throw(__("<b>Motivo esenzione IVA</b> mancante nella tassa {0}", [idx + 1]));
         }
         if (tax.custom_motivo_esenzione_iva !== undefined) {
           tax.tax_exemption_reason = "N3-Non Imponibili"
@@ -166,5 +162,41 @@ frappe.ui.form.on("Sales Invoice", {
       });
     }
 
+  },
+  after_save: (frm) => {
+    frm.doc.items.forEach((item) => {
+      if (item.tax_rate <= 0 && !item.custom_motivo_esenzione_iva) {
+          frm.dirty ()
+          frappe.throw(
+            __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
+          );
+        }
+    })
   }
 });
+
+// frappe.ui.form.on("Sales Taxes and Charges", {
+//   taxes_add: (frm) => {
+//     console.log(frm);
+//     updateTaxRate(frm);
+//   },
+//   taxes_remove: (frm) => {
+//     console.log(frm);
+//     updateTaxRate(frm);
+//   },
+//   taxes_move: (frm) => {
+//     console.log(frm);
+//     updateTaxRate(frm);
+//   },
+//   rate: (frm, cdt, cdn) => {
+//     console.log(frm.doc.taxes);
+//     frm.reload_doc();
+//     updateTaxRate(frm);
+//   },
+//   item_wise_tax_detail: (frm, cdt, cdn) => {
+//     console.log(frm.doc.taxes);
+//     updateTaxRate(frm);
+//   }
+
+
+// });
