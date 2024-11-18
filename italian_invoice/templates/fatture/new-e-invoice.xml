@@ -1,4 +1,4 @@
-{% import 'italian_invoice/templates/includes/macros.html' as macros %}<?xml version="1.0" encoding="UTF-8"?>
+{% import 'italian_invoice/templates/includes/macros.html' as macros %}{% set system_settings = frappe.get_doc('System Settings') %}{% set float_precision = system_settings.float_precision|int %}<?xml version="1.0" encoding="UTF-8"?>
 <p:FatturaElettronica SistemaEmittente="SoledeErp" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" versione="{{ doc.transmission_format_code }}" xsi:schemaLocation="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2 http://www.fatturapa.gov.it/export/fatturazione/sdi/fatturapa/v1.2/Schema_del_file_xml_FatturaPA_versione_1.2.xsd">
     <FatturaElettronicaHeader>
         <DatiTrasmissione>
@@ -117,7 +117,7 @@
                         {%- else %}
                             <Tipo>MG</Tipo>
                         {%- endif %}
-                        <Importo>{{ macros.format_float(doc.discount_amount|flt) }}</Importo>
+                        <Importo>{{ macros.format_float(doc.discount_amount|flt, float_precision) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
                 <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total|flt) }}</ImportoTotaleDocumento>
@@ -167,7 +167,7 @@
                 <Quantita>{{ macros.format_float(item.qty|abs) }}</Quantita>
                 <UnitaMisura>{{ item.stock_uom }}</UnitaMisura>
                 {% set net_rate = item.net_rate*doc.conversion_rate  %}
-                <PrezzoUnitario>{{ macros.format_float(net_rate) }}</PrezzoUnitario>
+                <PrezzoUnitario>{{ macros.format_float(net_rate, float_precision) }}</PrezzoUnitario>
                 {# {%- if item.discount_amount %}
                     <ScontoMaggiorazione>
                         {%- if item.discount_amount > 0.0 %}
@@ -178,10 +178,10 @@
                         {%- if item.discount_percentage > 0.0 %}
                             <Percentuale>{{ macros.format_float(item.discount_percentage|flt) }}</Percentuale>
                         {%- endif %}
-                        <Importo>{{ macros.format_float(item.discount_amount|flt) }}</Importo>
+                        <Importo>{{ macros.format_float(item.discount_amount|flt, float_precision) }}</Importo>
                     </ScontoMaggiorazione>
                 {%- endif %} #}
-                <PrezzoTotale>{{ macros.format_float(net_rate|round(2)*item.qty|abs) }}</PrezzoTotale>
+                <PrezzoTotale>{{ macros.format_float(net_rate|round(float_precision)*item.qty|abs) }}</PrezzoTotale>
                 {% set aliquota_iva = item.tax_rate  %}
                 {% if doc.type_of_document in ['TD18'] %}
                     <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
@@ -214,7 +214,7 @@
                 {%- if data.tax_exemption_reason %}
                     <Natura>{{ data.tax_exemption_reason }}</Natura>
                 {%- endif %}
-                <ImponibileImporto>{{ macros.format_float(data.taxable_amount|round(2)*doc.conversion_rate) }}</ImponibileImporto>
+                <ImponibileImporto>{{ macros.format_float(data.taxable_amount|round()*doc.conversion_rate) }}</ImponibileImporto>
                 <Imposta>{{ macros.format_float(data.tax_amount) }}</Imposta>
                 {%- if doc.vat_collectability %}
                     <EsigibilitaIVA>{{ doc.vat_collectability }}</EsigibilitaIVA>
