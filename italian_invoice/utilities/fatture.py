@@ -405,6 +405,7 @@ def get_invoice_summary(items, taxes):
 
     summary_data = frappe._dict()
     for tax in taxes:
+
         # Include only VAT charges.
         if tax.charge_type == "Actual":
             continue

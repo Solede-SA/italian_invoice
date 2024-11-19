@@ -214,7 +214,7 @@
                 {%- if data.tax_exemption_reason %}
                     <Natura>{{ data.tax_exemption_reason }}</Natura>
                 {%- endif %}
-                <ImponibileImporto>{{ macros.format_float(data.taxable_amount|round()*doc.conversion_rate) }}</ImponibileImporto>
+                <ImponibileImporto>{{ macros.format_float(data.taxable_amount|round(float_precision)*doc.conversion_rate) }}</ImponibileImporto>
                 <Imposta>{{ macros.format_float(data.tax_amount) }}</Imposta>
                 {%- if doc.vat_collectability %}
                     <EsigibilitaIVA>{{ doc.vat_collectability }}</EsigibilitaIVA>
