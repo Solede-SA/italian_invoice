@@ -711,6 +711,7 @@ def remove_e_invoice_attachments(doc):
 def prepare_and_attach_invoice(doc):
     remove_e_invoice_attachments(doc)
     invoice = get_invoice_data(doc)
+    print("invoice", invoice)
     xml_filename = get_e_invoice_file_name(doc)
 
     invoice_xml = frappe.render_template(
@@ -739,6 +740,8 @@ def prepare_and_attach_invoice(doc):
 def validate_invoice(docname, doctype):
     doc = frappe.get_doc(doctype, docname)
     frappe.has_permission(doctype, doc=doc, throw=True)
+
+    print("doc", doc)
 
     e_invoice_fileDoc = prepare_and_attach_invoice(doc)
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
