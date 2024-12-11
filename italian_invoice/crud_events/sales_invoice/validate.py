@@ -13,9 +13,6 @@ def execute(doc, method=None):
     if doc.is_return:
         original_invoice = get_original_invoice(doc)
 
-        print("original_invoice", original_invoice.payment_schedule)
-        print("isList", isinstance(original_invoice.payment_schedule, list))
-
         if original_invoice:
             if original_invoice.payment_schedule:
                 for payment_schedule in original_invoice.payment_schedule:
