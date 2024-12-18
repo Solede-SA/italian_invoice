@@ -33,6 +33,9 @@ def execute(doc, method=None):
             doc.payment_terms_template = original_invoice.payment_terms_template
 
     if is_subject_to_letter_of_intent(doc):
+        # setto il campo custom_bollo_virtuale a 1
+        doc.custom_bollo_virtuale = 1
+
         # per ogni item della fattura setta il campo custom_motivo_esenzione_iva con il valore "N3.5 se tax_rate è 0"
         for item in doc.items:
             if item.tax_rate == 0:
@@ -40,5 +43,5 @@ def execute(doc, method=None):
 
         # genera in alert che dice che il cliente è soggetto a lettera di intento e quindi il motivo esenzione iva è stato settato a N3.5
         frappe.msgprint(
-            "Il cliente è soggetto a lettera di intento. Il motivo esenzione IVA è stato settato a N3.5"
+            "Il cliente è soggetto a lettera di intento. Il motivo esenzione IVA è stato settato a N3.5 e il bollo virtuale è stato settato a 1"
         )
