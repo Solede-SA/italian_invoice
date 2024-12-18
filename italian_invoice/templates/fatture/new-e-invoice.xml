@@ -104,10 +104,10 @@
                 <Divisa>{{ doc.currency }}</Divisa>
                 <Data>{{ doc.posting_date }}</Data>
                 <Numero>{{ doc.unamended_name }}</Numero>
-                {%- if doc.stamp_duty %}
+                {%- if doc.custom_bollo_virtuale %}
                     <DatiBollo>
                     <BolloVirtuale>SI</BolloVirtuale>
-                    <ImportoBollo>{{ format_float(doc.stamp_duty) }}</ImportoBollo>
+                    <ImportoBollo>{{ macros.format_float(2|flt) }}</ImportoBollo>
                 </DatiBollo>
                 {%- endif %}
                 {# {%- if doc.discount_amount %}

@@ -230,6 +230,7 @@ def get_invoice_data(doc):
         "type_of_document": tipo_di_documento.codice,
         "currency": "EUR",
         "posting_date": doc.posting_date,
+        "custom_bollo_virtuale": doc.custom_bollo_virtuale,
         "unamended_name": get_unamended_name(doc),
         "return_against_unamended": (
             get_unamended_name(returned_against_doc) if doc.return_against else None
