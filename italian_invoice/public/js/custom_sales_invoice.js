@@ -66,6 +66,15 @@ const updateTaxRate = (frm) => {
   }
 }
 
+const setTaxesAndCharges = (frm) => {
+  if (frm.doc.customer) {
+    frappe.db.get_value("Customer", frm.doc.customer, "custom_abilita_lettera_dintento").then((r) => {
+      if (r.message.custom_abilita_lettera_dintento) {
+        frm.set_value("taxes_and_charges", "N3.5 - CBM");
+      }
+    });
+  }
+}
 
 frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
@@ -127,6 +136,7 @@ frappe.ui.form.on("Sales Invoice", {
   },
   customer: (frm) => {
     getCustomerTipoFatturaElettronica(frm);
+    setTaxesAndCharges(frm);
   },
   onload: (frm) => {
     getCustomerTipoFatturaElettronica(frm);
@@ -163,16 +173,16 @@ frappe.ui.form.on("Sales Invoice", {
     }
 
   },
-  after_save: (frm) => {
-    frm.doc.items.forEach((item) => {
-      if (item.tax_rate <= 0 && !item.custom_motivo_esenzione_iva) {
-          frm.dirty ()
-          frappe.throw(
-            __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
-          );
-        }
-    })
-  }
+  // after_save: (frm) => {
+  //   frm.doc.items.forEach((item) => {
+  //     if (item.tax_rate <= 0 && !item.custom_motivo_esenzione_iva) {
+  //         frm.dirty ()
+  //         frappe.throw(
+  //           __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
+  //         );
+  //       }
+  //   })
+  // }
 });
 
 // frappe.ui.form.on("Sales Taxes and Charges", {

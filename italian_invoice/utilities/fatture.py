@@ -129,6 +129,19 @@ def get_party_data(party, invoice):
             "phone": clean_phone(billing_address.phone),
             "email": billing_address.email_id,
         },
+        "custom_abilita_lettera_dintento": (
+            party.custom_abilita_lettera_dintento
+            if party.doctype == "Customer"
+            else None
+        ),
+        "custom_data_ricevuta_telematica": (
+            party.custom_data_ricevuta_telematica
+            if party.doctype == "Customer"
+            else None
+        ),
+        "custom_protocollo_ricezione": (
+            party.custom_protocollo_ricezione if party.doctype == "Customer" else None
+        ),
     }
 
     return party_data
@@ -142,6 +155,8 @@ def get_cessionario_committente(doc):
         cessionario = frappe.get_doc("Customer", doc.customer, as_dict=True)
     elif doctype == "Purchase Invoice":
         cessionario = frappe.get_doc("Company", doc.company, as_dict=True)
+
+    print("cessionario", cessionario)
 
     cessionario_committente = get_party_data(cessionario, doc)
     return cessionario_committente

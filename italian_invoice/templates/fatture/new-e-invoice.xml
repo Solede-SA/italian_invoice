@@ -192,6 +192,13 @@
                 {% endif %}
                 {%- if item.custom_motivo_esenzione_iva %}
                     <Natura>{{ item.custom_motivo_esenzione_iva }}</Natura>
+                    {%- if item.custom_motivo_esenzione_iva in ['N3.5'] %}
+                            <AltriDatiGestionali>
+                                <TipoDato>INTENTO</TipoDato>
+                                <RiferimentoTesto>{{ doc.cessionario_committente.custom_protocollo_ricezione }}</RiferimentoTesto>
+                                <RiferimentoData>{{ doc.cessionario_committente.custom_data_ricevuta_telematica }}</RiferimentoData>
+                            </AltriDatiGestionali>
+                    {%- endif %}
                 {%- endif %}
                 {% if item.custom_riferimento_amministrativo  %}
                     <RiferimentoAmministrazione>{{ item.custom_riferimento_amministrativo }}</RiferimentoAmministrazione>
