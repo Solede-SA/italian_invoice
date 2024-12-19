@@ -24,8 +24,11 @@ def manage_split_payment(doc, method):
     if not is_split:
         return
 
-    # Identifica la riga di tassa relativa all'IVA in split payment
-    vat_account = "05041007 - Iva Split Payment - CBM"
+    # Identifica i conti di tassa e di offset tra le preferenze della company
+    company = frappe.get_doc("Company", doc.company)
+    vat_account = company.get("custom_account_iva_split_payment")
+    offset_account = company.get("custom_account_iva_split_payment_offset")
+
     vat_tax_row = None
     for tax in doc.taxes:
         if tax.account_head == vat_account:
@@ -43,7 +46,6 @@ def manage_split_payment(doc, method):
 
     # Controlliamo se esiste già una riga di offset
     offset_description = "Offset IVA per split payment"
-    offset_account = "05041009 - Split Payment Offset - CBM"
     offset_row = None
     for tax in doc.taxes:
         if tax.account_head == offset_account and tax.description == offset_description:
