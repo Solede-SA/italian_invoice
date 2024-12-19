@@ -25,7 +25,6 @@ def manage_split_payment(doc, method):
         return
 
     # Identifica la riga di tassa relativa all'IVA in split payment
-    # Assumiamo che il conto per l'IVA in split payment sia "Split Payment VAT - AC"
     vat_account = "05041007 - Iva Split Payment - CBM"
     vat_tax_row = None
     for tax in doc.taxes:
@@ -34,27 +33,41 @@ def manage_split_payment(doc, method):
             break
 
     if not vat_tax_row:
-        # Se non troviamo la riga IVA, non facciamo nulla
+        # Nessuna IVA in split payment trovata, non facciamo nulla
         return
 
-    # La tax_amount di questa riga rappresenta l'IVA che non deve essere incassata dal cliente.
-    # Creiamo quindi una riga di tasse "negativa" che riduce l'importo dovuto dal cliente
-    # di pari ammontare.
     offset_amount = vat_tax_row.tax_amount
+    if offset_amount == 0:
+        # Se l'IVA è zero, non serve creare offset
+        return
 
-    # Aggiungiamo una riga tasse di tipo Actual negativa per compensare l'IVA dall'importo dovuto
-    doc.append(
-        "taxes",
-        {
-            "charge_type": "Actual",
-            "account_head": "05041009 - Split Payment Offset - CBM",  # Crea un account ad hoc se necessario
-            "description": "Offset IVA per split payment",
-            "tax_amount": -offset_amount,
-        },
-    )
+    # Controlliamo se esiste già una riga di offset
+    offset_description = "Offset IVA per split payment"
+    offset_account = "05041009 - Split Payment Offset - CBM"
+    offset_row = None
+    for tax in doc.taxes:
+        if tax.account_head == offset_account and tax.description == offset_description:
+            offset_row = tax
+            break
 
-    # Ricalcoliamo i totali dopo aver inserito la riga offset
-    doc.calculate_taxes_and_totals()
+    if not offset_row:
+        # Non esiste ancora, quindi la creiamo
+        doc.append(
+            "taxes",
+            {
+                "charge_type": "Actual",
+                "account_head": offset_account,
+                "description": offset_description,
+                "tax_amount": -offset_amount,
+            },
+        )
+        doc.calculate_taxes_and_totals()
+    else:
+        # Esiste già una riga di offset, verifichiamo se l'importo corrisponde
+        # Se l'importo è cambiato, lo aggiorniamo.
+        if offset_row.tax_amount != -offset_amount:
+            offset_row.tax_amount = -offset_amount
+            doc.calculate_taxes_and_totals()
 
 
 def execute(doc, method=None):
