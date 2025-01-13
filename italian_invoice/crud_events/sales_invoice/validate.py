@@ -95,6 +95,11 @@ def execute(doc, method=None):
             if item.tax_rate == 0:
                 item.custom_motivo_esenzione_iva = "N3.5"
 
+        # se il cliente è soggetto a lettera di intento per ogni riga di tassa setta il campo custom_motivo_esenzione_iva con il valore "N3.5" se tax_rate è 0
+        for tax in doc.taxes:
+            if tax.rate == 0:
+                tax.custom_motivo_esenzione_iva = "N3.5"
+
         # genera in alert che dice che il cliente è soggetto a lettera di intento e quindi il motivo esenzione iva è stato settato a N3.5
         frappe.msgprint(
             "Il cliente è soggetto a lettera di intento. Il motivo esenzione IVA è stato settato a N3.5 e il bollo virtuale è stato settato a 1"
