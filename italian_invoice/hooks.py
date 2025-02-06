@@ -238,7 +238,11 @@ doc_events = {
         "before_save": "italian_invoice.crud_events.sales_invoice.before_save.execute",
         "on_cancel": "italian_invoice.crud_events.sales_invoice.on_cancel.execute",
         "validate": "italian_invoice.crud_events.sales_invoice.validate.execute",
-    }
+    },
+    "Payment Entry": {
+        "before_save": "italian_invoice.crud_events.payment_entry.handle_rounding",
+        "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
+    },
 }
 
 fixtures = [
