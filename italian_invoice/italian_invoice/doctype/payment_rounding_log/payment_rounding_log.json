@@ -9,6 +9,7 @@
   "original_amount",
   "difference",
   "column_break_sqpk",
+  "reference_type",
   "reference_invoice",
   "rounded_amount"
  ],
@@ -37,20 +38,27 @@
   },
   {
    "fieldname": "reference_invoice",
-   "fieldtype": "Link",
+   "fieldtype": "Dynamic Link",
    "label": "Invoice",
-   "options": "Sales Invoice"
+   "options": "reference_type"
   },
   {
    "fieldname": "rounded_amount",
    "fieldtype": "Currency",
    "label": "Rounded Amount",
    "precision": "2"
+  },
+  {
+   "fieldname": "reference_type",
+   "fieldtype": "Select",
+   "label": "Tipo Fattura",
+   "options": "Sales Invoice\nPurchase Invoice"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-06 17:49:28.468163",
+ "modified": "2025-03-13 15:42:29.232390",
  "modified_by": "Administrator",
  "module": "Italian Invoice",
  "name": "Payment Rounding Log",

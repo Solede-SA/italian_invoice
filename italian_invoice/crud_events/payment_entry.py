@@ -44,11 +44,23 @@ def handle_rounding(doc, method):
 
 def after_insert(doc, method):
     if hasattr(doc, "_rounding_details"):
+        reference_invoice = doc._rounding_details.get("reference_invoice")
+        reference_type = None  # Imposta reference_type come None di default
+
+        if reference_invoice:
+            # Prova prima Sales Invoice
+            if frappe.db.exists("Sales Invoice", reference_invoice):
+                reference_type = "Sales Invoice"
+            # Se non è una Sales Invoice, prova Purchase Invoice
+            elif frappe.db.exists("Purchase Invoice", reference_invoice):
+                reference_type = "Purchase Invoice"
+
         frappe.get_doc(
             {
                 "doctype": "Payment Rounding Log",
                 "payment_entry": doc.name,
-                "reference_invoice": doc._rounding_details.get("reference_invoice"),
+                "reference_invoice": reference_invoice,
+                "reference_type": reference_type,
                 "original_amount": doc._rounding_details["original_amount"],
                 "rounded_amount": doc._rounding_details["rounded_amount"],
                 "difference": doc._rounding_details["difference"],
