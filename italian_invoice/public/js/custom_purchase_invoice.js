@@ -45,6 +45,7 @@ frappe.ui.form.on("Purchase Invoice", {
     if (["TD19", "TD17"].find((x) => x == frm.doc.custom_tipo_di_documento)) {
       frm.set_value("taxes_and_charges", "Reverse Charge");
     } else if (frm.doc.custom_tipo_di_documento == "TD18") {
+      console.log("TD18");
       frm.set_value("taxes_and_charges", "IVA acquisti CEE al 22%");
     } else {
       frm.set_value("taxes_and_charges", "");
