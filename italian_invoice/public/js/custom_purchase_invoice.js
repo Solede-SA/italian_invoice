@@ -63,7 +63,7 @@ frappe.ui.form.on("Purchase Invoice", {
       })
       if (frm.doc.taxes) {
         frm.doc.taxes.forEach((tax, idx) => {
-          if (tax.base_tax_amount == 0 && tax.custom_motivo_esenzione_iva === undefined) {
+          if (tax.base_tax_amount == 0 && (tax.custom_motivo_esenzione_iva === '' || tax.custom_motivo_esenzione_iva === undefined)) {
             frappe.throw(__("<b>Motivo esenzione IVA</b> mancante nella tassa {0}", [idx + 1]));
           }
         });
