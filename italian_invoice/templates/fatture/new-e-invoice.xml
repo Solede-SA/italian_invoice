@@ -248,7 +248,8 @@
                     {% else %}
                         <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount) }}</ImportoPagamento>
                     {% endif %}
-                    {% if payment_term.bank_account_name %}
+                    {% if payment_term.bank_account %}
+                        
                         <IstitutoFinanziario>{{ payment_term.bank_account_name }}</IstitutoFinanziario>
                         <IBAN>{{ payment_term.bank_account_iban }}</IBAN>
                         <ABI>{{ payment_term.bank_account_iban[5:10] }}</ABI>
