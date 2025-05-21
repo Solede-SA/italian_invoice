@@ -251,7 +251,7 @@ def get_invoice_data(doc):
         "tax_data": tax_data,
         "vat_collectability": vat_collectability,
         "payment_schedule": doc.payment_schedule,
-        "custom_bank_account": doc.custom_bank_account,
+        "custom_bank_account": doc.custom_bank_account if hasattr(doc, "custom_bank_account") else None,
         "apply_discount_on": doc.apply_discount_on,
         # "stamp_duty": doc.stamp_duty,
     }

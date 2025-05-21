@@ -256,14 +256,16 @@
                         <CAB>{{ payment_term.bank_account_iban[10:15] }}</CAB>
 
                     {% else %}
-                        {% set bank_account = frappe.get_doc ("Bank Account", doc.custom_bank_account) %}
-                        <IstitutoFinanziario>{{ bank_account.account_name }}</IstitutoFinanziario>
-                        <IBAN>{{ bank_account.iban }}</IBAN>
-                        <ABI>{{ bank_account.iban[5:10] }}</ABI>
-                        <CAB>{{ bank_account.iban[10:15] }}</CAB>
-                        {% if bank_account.swift_number%}
-                            <BIC>{{ bank_account.swift_number }}</BIC>
-                        {% endif %}
+                        {% if doc.custom_bank_account %}
+                            {% set bank_account = frappe.get_doc ("Bank Account", doc.custom_bank_account) %}
+                            <IstitutoFinanziario>{{ bank_account.account_name }}</IstitutoFinanziario>
+                            <IBAN>{{ bank_account.iban }}</IBAN>
+                            <ABI>{{ bank_account.iban[5:10] }}</ABI>
+                            <CAB>{{ bank_account.iban[10:15] }}</CAB>
+                            {% if bank_account.swift_number%}
+                                <BIC>{{ bank_account.swift_number }}</BIC>
+                            {% endif %}
+                        {% endif %}                        
                     {% endif %}
                 </DettaglioPagamento>
             {% endfor %}
