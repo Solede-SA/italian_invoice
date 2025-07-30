@@ -78,8 +78,6 @@ const setTaxesAndCharges = (frm) => {
 
 frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
-    console.log("Sales Invoice refresh triggered - payment terms debugging");
-    
     frm.remove_custom_button("Generate E-Invoice");
     frm.set_df_property('vat_collectability', 'read_only', 0)
     
@@ -159,7 +157,6 @@ frappe.ui.form.on("Sales Invoice", {
     
     // Se c'è un payment terms template ma nessun payment schedule, ricalcola
     if (frm.doc.payment_terms_template && (!frm.doc.payment_schedule || frm.doc.payment_schedule.length === 0)) {
-        console.log("Payment terms template found but no schedule, triggering recalculation");
         frm.trigger('payment_terms_template');
     }
   },
@@ -179,13 +176,8 @@ frappe.ui.form.on("Sales Invoice", {
   payment_terms_template: function(frm) {
     // Quando viene selezionato un payment terms template
     if (frm.doc.payment_terms_template) {
-        console.log("Payment Terms Template selected:", frm.doc.payment_terms_template);
-        console.log("Posting Date:", frm.doc.posting_date);
-        console.log("Current grand_total:", frm.doc.grand_total);
-        
         // Se la fattura è nuova e il grand_total è 0, calcola manualmente
         if (frm.doc.__islocal && (!frm.doc.grand_total || frm.doc.grand_total === 0)) {
-            console.log("New invoice with no grand_total, calculating manually");
             calculate_payment_schedule_manually(frm);
         } else {
             // Forza il ricalcolo del payment schedule
@@ -199,16 +191,12 @@ frappe.ui.form.on("Sales Invoice", {
                     bill_date: frm.doc.bill_date
                 },
                 callback: function(r) {
-                    console.log("Payment Terms Response:", r.message);
-                    
                     if (r.message && r.message.length > 0) {
                         // Pulisci il payment schedule esistente
                         frm.clear_table('payment_schedule');
                         
                         // Aggiungi le nuove righe
                         r.message.forEach(function(term) {
-                            console.log("Adding payment term:", term);
-                            
                             let row = frm.add_child('payment_schedule');
                             row.payment_term = term.payment_term;
                             row.due_date = term.due_date;
@@ -225,12 +213,10 @@ frappe.ui.form.on("Sales Invoice", {
                         update_main_due_date(frm);
                     } else {
                         // Se non ci sono termini, prova a calcolarli manualmente
-                        console.log("No payment terms returned, trying manual calculation");
                         calculate_payment_schedule_manually(frm);
                     }
                 },
                 error: function(err) {
-                    console.error("Error getting payment terms:", err);
                     // In caso di errore, prova il calcolo manuale
                     calculate_payment_schedule_manually(frm);
                 }
@@ -388,21 +374,16 @@ function check_due_date_consistency(frm) {
 function calculate_payment_schedule_manually(frm) {
     // Calcolo manuale del payment schedule quando il metodo standard fallisce
     if (!frm.doc.payment_terms_template || !frm.doc.posting_date) {
-        console.log("Missing required data for payment schedule calculation");
         return;
     }
     
     // Ottieni i dettagli del payment terms template
     frappe.db.get_doc('Payment Terms Template', frm.doc.payment_terms_template)
         .then(template => {
-            console.log("Payment Terms Template details:", template);
-            
             if (template.terms && template.terms.length > 0) {
                 frm.clear_table('payment_schedule');
                 
                 template.terms.forEach(term_detail => {
-                    console.log("Processing term detail:", term_detail);
-                    
                     // term_detail contiene già tutti i campi necessari dal Payment Terms Template Detail
                     // che ha fatto fetch_from del Payment Term
                     let due_date = calculate_due_date_from_term(frm.doc.posting_date, term_detail);
@@ -434,18 +415,12 @@ function calculate_payment_schedule_manually(frm) {
             }
         })
         .catch(err => {
-            console.error("Error fetching payment terms template:", err);
             frappe.msgprint(__("Error loading payment terms template"));
         });
 }
 
 function calculate_due_date_from_term(posting_date, term) {
     // Calcola la due_date basandosi sul tipo di termine di pagamento
-    console.log("Calculating due date for term:", term);
-    console.log("Due date based on:", term.due_date_based_on);
-    console.log("Credit days:", term.credit_days);
-    console.log("Credit months:", term.credit_months);
-    
     let due_date;
     
     if (term.due_date_based_on === "Day(s) after invoice date") {
@@ -463,6 +438,5 @@ function calculate_due_date_from_term(posting_date, term) {
         due_date = posting_date;
     }
     
-    console.log("Calculated due date:", due_date);
     return due_date;
 }
