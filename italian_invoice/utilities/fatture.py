@@ -7,7 +7,7 @@ from frappe import _
 from frappe.utils import cstr, flt
 from frappe.utils.file_manager import remove_file
 from frappe.utils import today
-from xmlschema import validate
+from italian_invoice.validation import XMLInvoiceValidator, ValidationErrorFormatter
 
 from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from erpnext.regional.italy import state_codes
@@ -728,7 +728,6 @@ def remove_e_invoice_attachments(doc):
 def prepare_and_attach_invoice(doc):
     remove_e_invoice_attachments(doc)
     invoice = get_invoice_data(doc)
-    print("invoice", invoice)
     xml_filename = get_e_invoice_file_name(doc)
 
     invoice_xml = frappe.render_template(
@@ -753,24 +752,47 @@ def prepare_and_attach_invoice(doc):
     return _file
 
 
+def validate_xml_content(xml_content: str, doc=None):
+    """
+    Valida contenuto XML senza salvare file
+
+    Args:
+        xml_content: Contenuto XML da validare
+        doc: Documento opzionale per contesto
+
+    Returns:
+        Tuple (is_valid, report)
+    """
+    validator = XMLInvoiceValidator()
+    return validator.validate(xml_content, doc)
+
+
 @frappe.whitelist()
 def validate_invoice(docname, doctype):
     doc = frappe.get_doc(doctype, docname)
     frappe.has_permission(doctype, doc=doc, throw=True)
 
-    print("doc", doc)
-
+    # Genera e allega fattura
     e_invoice_fileDoc = prepare_and_attach_invoice(doc)
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
-    xsd_file = frappe.get_app_path("italian_invoice", "utilities/schema_vfpr12.xsd")
 
-    try:
-        validate(xml_file, xsd_file)
-        print("Il file XML è valido")
-    except Exception as e:
-        # Stampa dettagli dell'errore
+    # Leggi contenuto XML
+    with open(xml_file, 'r', encoding='utf-8') as f:
+        xml_content = f.read()
+
+    # Valida con nuovo sistema
+    validator = XMLInvoiceValidator()
+    is_valid, report = validator.validate(xml_content, doc)
+
+    if not is_valid:
+        # Formatta e mostra errori
+        ValidationErrorFormatter.show_validation_dialog(report)
+        ValidationErrorFormatter.log_validation_errors(report, doc.name)
+
+        # Solleva eccezione con sommario
         frappe.throw(
-            _("Errore di validazione: {0}").format(e), title=_("Errore di validazione")
+            _("Validazione fallita. {0}").format(report['summary']),
+            title=_("Errore di validazione fattura elettronica")
         )
 
     return e_invoice_fileDoc.file_url
