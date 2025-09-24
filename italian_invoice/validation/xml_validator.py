@@ -109,66 +109,76 @@ class XMLInvoiceValidator:
             return False
 
     def _parse_xsd_error(self, error: xmlschema.XMLSchemaException):
-        """Interpreta errore XSD in formato user-friendly"""
+        """Interpreta errore XSD in formato user-friendly mantenendo dettagli"""
         error_str = str(error)
 
-        # Pattern comuni di errore
-        patterns = {
-            r"Element '.*?(\w+)': This element is not expected": {
-                'message': 'Elemento non previsto: {field}',
-                'suggestion': 'Rimuovi o correggi l\'elemento {field}'
-            },
-            r"Element '.*?(\w+)': Missing child element": {
-                'message': 'Campo obbligatorio mancante: {field}',
-                'suggestion': 'Aggiungi il campo {field} richiesto'
-            },
-            r"Element '.*?(\w+)'.*?is not valid": {
-                'message': 'Valore non valido per: {field}',
-                'suggestion': 'Verifica il formato del campo {field}'
-            },
-            r"Invalid date.*?'(.*?)'": {
-                'message': 'Data non valida: {field}',
-                'suggestion': 'Usa formato YYYY-MM-DD'
-            },
-            r"pattern.*?'(.*?)'.*?not accepted": {
-                'message': 'Formato non valido',
-                'suggestion': 'Verifica il pattern richiesto: {field}'
-            }
-        }
+        # Estrai il path completo se disponibile
+        path_match = re.search(r"Path: (.*?)(?:\n|$)", error_str)
+        xml_path = path_match.group(1) if path_match else None
 
-        # Cerca pattern matching
-        parsed = False
-        for pattern, info in patterns.items():
-            match = re.search(pattern, error_str)
-            if match:
-                field = match.group(1) if match.groups() else 'sconosciuto'
-                self.errors.append({
-                    'type': 'XSD_VALIDATION',
-                    'severity': 'error',
-                    'message': info['message'].format(field=field),
-                    'details': error_str,
-                    'line': getattr(error, 'sourceline', None),
-                    'field': field,
-                    'suggestion': info['suggestion'].format(field=field)
-                })
-                parsed = True
-                break
+        # Approccio generico: estrai valore, campo e path direttamente dall'errore
+        # Estrai valore problematico
+        value_match = re.search(r"failed validating '(.*?)'", error_str)
+        if not value_match:
+            value_match = re.search(r"'(.*?)' is not accepted", error_str)
+            if not value_match:
+                value_match = re.search(r"'(.*?)' is not valid", error_str)
+        value = value_match.group(1) if value_match else None
 
-        # Fallback per errori non riconosciuti
-        if not parsed:
-            # Estrai nome campo se possibile
-            field_match = re.search(r"'.*?(\w+)'", error_str)
-            field = field_match.group(1) if field_match else None
+        # Costruisci messaggio generico ma informativo
+        if xml_path:
+            # Pulisci il path
+            path_parts = xml_path.split('/')
+            clean_parts = []
+            for p in path_parts:
+                if p:
+                    # Rimuovi namespace {http://...}
+                    p = re.sub(r'\{.*?\}', '', p)
+                    # Rimuovi prefisso p:
+                    p = re.sub(r'^\w+:', '', p)
+                    clean_parts.append(p)
 
-            self.errors.append({
-                'type': 'XSD_VALIDATION',
-                'severity': 'error',
-                'message': 'Errore validazione schema',
-                'details': error_str,
-                'line': getattr(error, 'sourceline', None),
-                'field': field,
-                'suggestion': 'Verifica la conformità allo schema XSD FatturaPA'
-            })
+            # Path leggibile
+            readable_path = ' → '.join(clean_parts) if clean_parts else xml_path
+
+            # Prendi l'ultimo elemento come nome campo
+            field_name = clean_parts[-1] if clean_parts else None
+
+            if value and field_name:
+                message = f'Il valore "{value}" non rispetta il formato richiesto nel campo {field_name} (percorso: {readable_path})'
+            elif field_name:
+                message = f'Errore nel campo {field_name} (percorso: {readable_path})'
+            elif value:
+                message = f'Il valore "{value}" non è valido (percorso: {readable_path})'
+            else:
+                message = f'Errore di validazione (percorso: {readable_path})'
+        else:
+            # Senza path
+            if value:
+                message = f'Il valore "{value}" non è valido'
+            else:
+                # Mantieni almeno parte dell'errore originale
+                message = f'Errore validazione: {error_str[:150]}...' if len(error_str) > 150 else f'Errore validazione: {error_str}'
+
+        # Suggerimento generico basato sul contenuto dell'errore
+        suggestion = 'Verifica il formato secondo le specifiche FatturaPA'
+        if 'pattern' in error_str.lower():
+            suggestion = 'Verifica che il valore rispetti il formato richiesto'
+        elif 'missing' in error_str.lower():
+            suggestion = 'Aggiungi i campi obbligatori mancanti'
+        elif 'not expected' in error_str.lower():
+            suggestion = 'Rimuovi o correggi gli elementi non previsti'
+
+        self.errors.append({
+            'type': 'XSD_VALIDATION',
+            'severity': 'error',
+            'message': message,
+            'details': error_str,
+            'line': getattr(error, 'sourceline', None),
+            'field': field_name if xml_path else None,
+            'path': xml_path,
+            'suggestion': suggestion
+        })
 
     def _validate_business_rules(self, xml_content: str, doc=None):
         """Validazioni specifiche business italiane"""
