@@ -776,6 +776,86 @@ def validate_invoice(docname, doctype):
     return e_invoice_fileDoc.file_url
 
 
+# Cache per provider SDI
+_provider_cache = {}
+
+
+def get_sdi_provider(company_name):
+    """
+    Ottiene il provider SDI configurato per la company
+    Con cache per evitare istanze multiple (DRY)
+    """
+    if company_name in _provider_cache:
+        return _provider_cache[company_name]
+
+    company = frappe.get_doc("Company", company_name)
+    provider_type = company.get("custom_sdi_provider", "OpenAPI")
+
+    if provider_type == "OpenAPI":
+        from italian_invoice.providers.openapi_provider import OpenAPIProvider
+        provider = OpenAPIProvider()
+    elif provider_type == "Manual":
+        from italian_invoice.providers.manual_provider import ManualProvider
+        provider = ManualProvider()
+    else:
+        # Provider custom
+        provider_class = frappe.get_attr(provider_type)
+        provider = provider_class()
+
+    _provider_cache[company_name] = provider
+    return provider
+
+
+def identify_company_from_webhook_data(data):
+    """
+    Identifica la company dai dati del webhook
+    Cerca la partita IVA nei dati ricevuti
+    """
+    # Cerca partita IVA azienda nei vari formati possibili
+    possible_keys = [
+        "cessionario_committente.dati_anagrafici.id_fiscale_iva.id_codice",
+        "company_tax_id",
+        "fiscal_id",
+        "tax_id"
+    ]
+
+    for key in possible_keys:
+        # Usa la funzione di ricerca esistente se disponibile
+        if "." in key:
+            from italian_invoice.providers.openapi_provider import OpenAPIProvider
+            provider = OpenAPIProvider()
+            tax_id = provider._search_value_in_json(data, key)
+        else:
+            tax_id = data.get(key)
+
+        if tax_id:
+            company_list = frappe.get_list("Company", filters={"tax_id": tax_id})
+            if company_list:
+                return frappe.get_doc("Company", company_list[0]["name"])
+
+    frappe.throw("Impossibile identificare la Company dai dati webhook")
+
+
+def handle_sdi_webhook(endpoint, data):
+    """
+    Router centrale per webhook SDI
+    Identifica la company dal contenuto e delega al provider
+    """
+    try:
+        # Identifica company
+        company = identify_company_from_webhook_data(data)
+
+        # Ottieni provider configurato
+        provider = get_sdi_provider(company.name)
+
+        # Delega al provider
+        return provider.handle_webhook(endpoint, data)
+
+    except Exception as e:
+        frappe.log_error(f"Errore gestione webhook {endpoint}: {str(e)}", "SDI Webhook Error")
+        raise
+
+
 @frappe.whitelist()
 def get_xml(docname, doctype):
     file_path = validate_invoice(docname, doctype)

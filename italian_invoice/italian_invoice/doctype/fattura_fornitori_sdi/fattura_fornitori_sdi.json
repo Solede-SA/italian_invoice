@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-09-20 16:53:53.916148",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "denominazione_fornitore",
+  "fattura",
+  "column_break_tcxn",
+  "partita_iva_fornitore",
+  "stato",
+  "section_break_ndmu",
+  "uuid",
+  "dati_fattura",
+  "company",
+  "via_webhook"
+ ],
+ "fields": [
+  {
+   "fieldname": "dati_fattura", 
+   "fieldtype": "JSON",
+   "label": "Dati Fattura"
+  },
+  {
+   "fieldname": "via_webhook",
+   "fieldtype": "Check",
+   "label": "Via Webhook",
+   "hidden": 1,
+   "default": 0
+  },
+  {
+   "fieldname": "uuid",
+   "fieldtype": "Data",
+   "label": "UUID"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "partita_iva_fornitore",
+   "fieldtype": "Data",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Partita Iva Fornitore",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "denominazione_fornitore",
+   "fieldtype": "Data",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Denominazione fornitore",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_tcxn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ndmu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "Da importare",
+   "fieldname": "stato",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Stato",
+   "options": "Da importare\nImportata"
+  },
+  {
+   "fieldname": "fattura",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Fattura",
+   "options": "Purchase Invoice"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-01-24 10:22:32.807548",
+ "modified_by": "Administrator",
+ "module": "Italian Invoice",
+ "name": "Fattura Fornitori SDI",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
