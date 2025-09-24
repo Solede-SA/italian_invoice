@@ -177,21 +177,27 @@ class OpenAPIProvider(SDIProvider):
             data_notifica = None
 
             if event == "customer-notification":
-                uuid = data["notification"]["invoice_uuid"]
-                data_notifica = data["notification"]["created_at"]
-                stato = data["notification"]["type"]
+                # I dati potrebbero essere avvolti in "data" o essere diretti
+                notification_data = data.get("data", data)
+                uuid = notification_data["notification"]["invoice_uuid"]
+                data_notifica = notification_data["notification"]["created_at"]
+                stato = notification_data["notification"]["type"]
                 if stato == "NE":
-                    stato = data["notification"]["message"]["esito_committente"]["esito"]
+                    stato = notification_data["notification"]["message"]["esito_committente"]["esito"]
 
             elif event == "customer-invoice":
-                uuid = data["invoice"]["uuid"]
-                data_notifica = data["invoice"]["created_at"]
+                # I dati potrebbero essere avvolti in "data" o essere diretti
+                invoice_data = data.get("data", data)
+                uuid = invoice_data["invoice"]["uuid"]
+                data_notifica = invoice_data["invoice"]["created_at"]
                 stato = "Inviata"
 
             elif event == "legal-storage-receipt":
-                uuid = data["object_id"]
-                data_notifica = data.get("receipt_received_at", data["updated_at"])
-                stato = data.get("status", "")
+                # I dati potrebbero essere avvolti in "data" o essere diretti
+                receipt_data = data.get("data", data)
+                uuid = receipt_data["object_id"]
+                data_notifica = receipt_data.get("receipt_received_at", receipt_data["updated_at"])
+                stato = receipt_data.get("status", "")
 
             # Trova e aggiorna transazione
             if uuid:

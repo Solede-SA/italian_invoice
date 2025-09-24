@@ -811,41 +811,186 @@ def identify_company_from_webhook_data(data):
     Identifica la company dai dati del webhook
     Cerca la partita IVA nei dati ricevuti
     """
-    # Cerca partita IVA azienda nei vari formati possibili
-    possible_keys = [
-        "cessionario_committente.dati_anagrafici.id_fiscale_iva.id_codice",
-        "company_tax_id",
-        "fiscal_id",
-        "tax_id"
-    ]
+    print("=== WEBHOOK DATA RECEIVED ===")
+    print(json.dumps(data, indent=2)[:2000])  # Primi 2000 caratteri per debug
 
-    for key in possible_keys:
-        # Usa la funzione di ricerca esistente se disponibile
-        if "." in key:
-            from italian_invoice.providers.openapi_provider import OpenAPIProvider
-            provider = OpenAPIProvider()
-            tax_id = provider._search_value_in_json(data, key)
+    # Determina quale campo cercare in base al tipo di evento
+    event_type = data.get("event", "")
+    print(f"Event type: {event_type}")
+
+    def get_nested_value(obj, path):
+        """Naviga un percorso nel JSON"""
+        current = obj
+        for key in path:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return None
+        return current
+
+    # Controlla se è un'autofattura (TD17-TD19 o altro tipo specifico)
+    tipo_documento = None
+    try:
+        # Prova a trovare il tipo documento
+        invoice_data = data.get("data", {}).get("invoice", {})
+        if not invoice_data:
+            invoice_data = data.get("invoice", {})
+
+        body = invoice_data.get("fattura_elettronica_body", [])
+        if body and len(body) > 0:
+            tipo_documento = body[0].get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento", "")
+            print(f"Tipo documento: {tipo_documento}")
+    except:
+        pass
+
+    # Per autofatture (TD17-TD19) o quando il cedente è estero, cerchiamo in modi diversi
+    is_autofattura = tipo_documento in ["TD17", "TD18", "TD19", "TD20"]
+
+    # Controlla se il cedente è estero
+    cedente_paese = None
+    try:
+        cedente_path = ["data", "invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_paese"]
+        cedente_paese = get_nested_value(data, cedente_path)
+        if not cedente_paese:
+            cedente_path = ["invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_paese"]
+            cedente_paese = get_nested_value(data, cedente_path)
+    except:
+        pass
+
+    is_foreign_supplier = cedente_paese and cedente_paese != "IT"
+    print(f"Is autofattura: {is_autofattura}, Foreign supplier: {is_foreign_supplier}, Paese: {cedente_paese}")
+
+    if event_type == "customer-notification":
+        if is_autofattura or is_foreign_supplier:
+            # Per autofatture, cerchiamo nei dati di trasmissione o nel cessionario
+            possible_paths = [
+                # Prima prova nel codice trasmittente (chi ha inviato il file)
+                ["data", "invoice", "fattura_elettronica_header", "dati_trasmissione", "id_trasmittente", "id_codice"],
+                ["invoice", "fattura_elettronica_header", "dati_trasmissione", "id_trasmittente", "id_codice"],
+                # Poi nel cessionario (per autofatture potrebbe essere la nostra azienda)
+                ["data", "invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+                ["invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ]
         else:
-            tax_id = data.get(key)
+            # Per fatture normali, la nostra company è il CEDENTE (chi emette)
+            possible_paths = [
+                ["data", "invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+                ["invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ]
+    elif event_type == "supplier-invoice":
+        # Per fatture fornitori, la nostra company è il CESSIONARIO (chi riceve)
+        # Nota: supplier-invoice può avere la struttura con "payload"
+        possible_paths = [
+            # Con payload
+            ["data", "invoice", "payload", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["invoice", "payload", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            # Senza payload (vecchio formato)
+            ["data", "invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ]
+    else:
+        # Fallback: prova entrambi
+        possible_paths = [
+            # Prima prova come cedente (fatture attive)
+            ["data", "invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            # Poi come cessionario (fatture passive)
+            ["data", "invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ]
+
+    # Aggiungi sempre i campi diretti come fallback
+    possible_paths.extend([
+        ["company_tax_id"],
+        ["fiscal_id"],
+        ["tax_id"]
+    ])
+
+    for path in possible_paths:
+        tax_id = get_nested_value(data, path)
+        print(f"Trying path {' -> '.join(path)}: {tax_id}")
 
         if tax_id:
+            # Rimuovi prefisso IT se presente
+            if isinstance(tax_id, str) and tax_id.startswith("IT"):
+                tax_id = tax_id[2:]
+
+            print(f"Searching for company with tax_id: {tax_id}")
+
+            # Cerca la company
             company_list = frappe.get_list("Company", filters={"tax_id": tax_id})
             if company_list:
+                print(f"✓ Company found: {company_list[0]['name']}")
                 return frappe.get_doc("Company", company_list[0]["name"])
+            else:
+                print(f"✗ No company found with tax_id: {tax_id}")
 
+    print("ERROR: Could not identify company from webhook data")
+    print(f"Paths tried: {possible_paths}")
     frappe.throw("Impossibile identificare la Company dai dati webhook")
 
 
 def handle_sdi_webhook(endpoint, data):
     """
     Router centrale per webhook SDI
-    Identifica la company dal contenuto e delega al provider
+    Per customer-notification: usa UUID per trovare la transazione esistente
+    Per supplier-invoice: identifica la company dal cessionario
     """
     try:
-        # Identifica company
-        company = identify_company_from_webhook_data(data)
+        if endpoint == "customer_notification":
+            # Per notifiche, l'UUID identifica univocamente la transazione
+            # Non serve identificare la company
+            uuid = None
 
-        # Ottieni provider configurato
+            # Estrai UUID in base alla struttura del webhook
+            if "data" in data and "notification" in data["data"]:
+                uuid = data["data"]["notification"].get("invoice_uuid")
+            elif "notification" in data:
+                uuid = data["notification"].get("invoice_uuid")
+
+            if not uuid:
+                frappe.throw("UUID non trovato nel webhook customer-notification")
+
+            # Trova la transazione per UUID
+            transazioni = frappe.get_list(
+                "Transazione SDI",
+                filters={"uuid": uuid},
+                fields=["name", "tipo_fattura", "fattura"]
+            )
+
+            if not transazioni:
+                frappe.throw(f"Transazione SDI non trovata per UUID: {uuid}")
+
+            # Ottieni la company dalla fattura collegata
+            transazione = frappe.get_doc("Transazione SDI", transazioni[0]["name"])
+            doc = frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
+            company = frappe.get_doc("Company", doc.company)
+
+        elif endpoint == "supplier_invoice":
+            # Per fatture fornitori, identifica la company dal cessionario
+            # Comportamento originale: cerca con search_value_in_json
+            from italian_invoice.providers.openapi_provider import OpenAPIProvider
+            provider_temp = OpenAPIProvider()
+
+            partita_iva_company = provider_temp._search_value_in_json(
+                data,
+                "cessionario_committente.dati_anagrafici.id_fiscale_iva.id_codice"
+            )
+
+            if not partita_iva_company:
+                frappe.throw("Partita IVA company non trovata nel webhook")
+
+            company_list = frappe.get_list("Company", filters={"tax_id": partita_iva_company})
+
+            if not company_list:
+                frappe.throw(f"Company non trovata con P.IVA: {partita_iva_company}")
+
+            company = frappe.get_doc("Company", company_list[0]["name"])
+
+        else:
+            frappe.throw(f"Endpoint webhook non riconosciuto: {endpoint}")
+
+        # Ottieni provider configurato per la company
         provider = get_sdi_provider(company.name)
 
         # Delega al provider
