@@ -233,17 +233,13 @@ doc = frappe.get_doc("Sales Invoice", "SINV-00001")
 doc.custom_tipo_di_documento = "TD01"
 doc.save()
 
-# Genera XML
+# Genera e valida XML (la validazione avviene automaticamente)
 xml = frappe.call("italian_invoice.utilities.fatture.get_xml",
                   "SINV-00001", "Sales Invoice")
 print(xml[:500])  # Prime 500 caratteri
 
-# Valida XML
-from italian_invoice.utils import validate_xml
-is_valid, errors = validate_xml.validate_invoice(xml)
-print(f"Valido: {is_valid}")
-if errors:
-    print(f"Errori: {errors}")
+# La validazione XSD è automatica durante la generazione
+# Se l'XML non è valido, verrà sollevata un'eccezione
 ```
 
 ### Test Import Fatture Passive
@@ -271,7 +267,8 @@ print(f"Purchase Invoice creata: {result['name']}")
 
 ### Validazione
 
-- Gli XML generati sono validati automaticamente contro lo schema XSD ufficiale
+- Gli XML generati sono validati automaticamente contro lo schema XSD ufficiale usando `xmlschema`
+- La validazione avviene in `italian_invoice.utilities.fatture.validate_invoice()`
 - Errori di validazione sono loggati in Error Log
 - Provider Manual salva anche XML non validi per debug
 
@@ -285,11 +282,8 @@ italian_invoice/
 │   ├── manual_provider.py # Provider test/sviluppo
 │   └── openapi_provider.py # Integrazione OpenAPI.it
 ├── utilities/
-│   ├── fatture.py         # Generazione XML attive + factory
+│   ├── fatture.py         # Generazione XML attive + validazione XSD
 │   └── fatture_passive.py # Import e processing passive
-├── utils/
-│   ├── validate_xml.py    # Validazione XSD
-│   └── xml_parser.py      # Parser XML fatture
 ├── italian_invoice/doctype/  # DocTypes personalizzati
 └── fixtures/              # Custom fields e configurazioni
 ```
