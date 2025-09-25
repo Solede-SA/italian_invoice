@@ -6,7 +6,7 @@ App Frappe/ERPNext per la gestione delle fatture elettroniche italiane secondo l
 
 ### Fatturazione Attiva
 - ✅ **Generazione XML** fatture elettroniche conformi allo standard SDI
-- ✅ **Validazione XSD** automatica secondo schema ufficiale
+- ✅ **Validazione avanzata** con messaggi di errore chiari e percorsi XML
 - ✅ **Supporto documenti** Sales Invoice, Credit Note, Debit Note
 - ✅ **Tracking transazioni** con stato invio e notifiche SDI
 
@@ -265,12 +265,28 @@ result = fatture_passive.process_supplier_invoice(
 print(f"Purchase Invoice creata: {result['name']}")
 ```
 
-### Validazione
+### Sistema di Validazione
 
-- Gli XML generati sono validati automaticamente contro lo schema XSD ufficiale usando `xmlschema`
-- La validazione avviene in `italian_invoice.utilities.fatture.validate_invoice()`
-- Errori di validazione sono loggati in Error Log
-- Provider Manual salva anche XML non validi per debug
+Il sistema di validazione XML è stato completamente riprogettato per fornire feedback chiaro e utile:
+
+#### Validazione Multi-livello
+- **Struttura XML**: Verifica che il file sia XML valido
+- **Schema XSD**: Conformità allo standard FatturaPA v1.2
+- **Business Rules**: Controlli specifici (P.IVA, CF, date, importi)
+
+#### Messaggi di Errore Migliorati
+Invece di errori tecnici XSD, ora ricevi messaggi chiari:
+```
+❌ Il valore "COMO" non rispetta il formato richiesto nel campo Provincia
+   (percorso: FatturaElettronicaHeader → CessionarioCommittente → Sede → Provincia)
+💡 Verifica che il valore rispetti il formato richiesto
+```
+
+#### Architettura Validazione
+- `italian_invoice/validation/xml_validator.py`: Classe XMLInvoiceValidator
+- `italian_invoice/validation/error_formatter.py`: Formattazione errori user-friendly
+- Report dettagliati con errori critici e warning non bloccanti
+- Logging strutturato per debug
 
 ## 🛠️ Architettura Tecnica
 
@@ -281,8 +297,11 @@ italian_invoice/
 │   ├── base.py            # Classe astratta SDIProvider
 │   ├── manual_provider.py # Provider test/sviluppo
 │   └── openapi_provider.py # Integrazione OpenAPI.it
+├── validation/             # Sistema validazione XML
+│   ├── xml_validator.py   # Validatore multi-livello
+│   └── error_formatter.py # Formattazione errori
 ├── utilities/
-│   ├── fatture.py         # Generazione XML attive + validazione XSD
+│   ├── fatture.py         # Generazione XML attive
 │   └── fatture_passive.py # Import e processing passive
 ├── italian_invoice/doctype/  # DocTypes personalizzati
 └── fixtures/              # Custom fields e configurazioni
@@ -292,9 +311,11 @@ italian_invoice/
 
 #### Fatturazione Attiva
 ```
-ERPNext Invoice → italian_invoice.get_xml() → Provider.send_invoice() → SDI
-                                ↓
-                        Validazione XSD
+ERPNext Invoice → italian_invoice.get_xml() → XMLInvoiceValidator → Provider.send_invoice() → SDI
+                                ↓                      ↓
+                        Generazione XML        Validazione multi-livello
+                                ↓                      ↓
+                        File XML validato     Report errori user-friendly
                                 ↓
                         Transazione SDI (tracking)
 ```
