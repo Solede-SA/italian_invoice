@@ -16,18 +16,17 @@ def calculate_billing_gap(delivery_note_name):
     # Calcola il totale da fatturare
     total_amount = sum(flt(item.amount) for item in dn.items)
 
-    # Calcola il totale già fatturato
+    # Calcola il totale già fatturato dalle righe (come fa ERPNext)
     total_billed = sum(flt(item.billed_amt) for item in dn.items)
 
-    # Calcola la differenza
-    billing_gap = total_amount - total_billed
+    # Calcola la differenza e arrotonda a 4 decimali per evitare problemi di float
+    billing_gap = round(total_amount - total_billed, 4)
 
     # Può essere forzato se la differenza è tra 0 e 1 (non negativa e sotto la soglia)
     can_force_complete = 0 < billing_gap < 1.0
 
-    # Aggiorna il campo custom
-    if dn.custom_billing_gap != billing_gap:
-        frappe.db.set_value("Delivery Note", delivery_note_name, "custom_billing_gap", billing_gap)
+    # NON aggiorniamo direttamente il DB per evitare lock
+    # Il valore verrà aggiornato dal client JavaScript
 
     return {
         'total_amount': total_amount,

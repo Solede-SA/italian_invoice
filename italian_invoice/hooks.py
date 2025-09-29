@@ -244,9 +244,6 @@ doc_events = {
         "before_save": "italian_invoice.crud_events.payment_entry.handle_rounding",
         "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
     },
-    "Delivery Note": {
-        "on_update_after_submit": "italian_invoice.api.delivery_note_billing_adjustment.update_billing_gap_on_save",
-    },
 }
 
 fixtures = [

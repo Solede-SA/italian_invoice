@@ -119,7 +119,8 @@ frappe.ui.form.on("Sales Invoice", {
         __("Fatt. Elettronica"),
       );
    }
-    if (frm.doc.custom_bank_account === undefined) {
+    // Setta il bank account di default SOLO per documenti nuovi/draft, non per quelli submitted
+    if (frm.doc.docstatus === 0 && frm.doc.custom_bank_account === undefined) {
       frappe.call({
         method: "italian_invoice.api.company.bank.get_default_bank_account",
         args: {

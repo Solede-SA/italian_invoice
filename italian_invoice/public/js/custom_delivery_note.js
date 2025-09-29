@@ -1,5 +1,6 @@
 frappe.ui.form.on('Delivery Note', {
     refresh: function(frm) {
+        console.log("Custom Delivery Note JS loaded - refresh event");
         // Solo per DDT submitted
         if (frm.doc.docstatus !== 1) return;
 
@@ -99,17 +100,48 @@ frappe.ui.form.on('Delivery Note', {
                 }
             });
         }
+
+        // Aggiungi bottone per vedere i log di aggiustamento
+        if (frm.doc.docstatus === 1) {
+            frm.add_custom_button(__('View Adjustment Logs'), function() {
+                frappe.set_route("List", "Delivery Note Billing Adjustment Log", {
+                    "delivery_note": frm.doc.name
+                });
+            }, __('View'));
+        }
     },
 
     onload: function(frm) {
+        console.log("Custom Delivery Note JS loaded - onload event");
         // Calcola il gap quando il documento viene caricato
-        if (frm.doc.docstatus === 1 && frm.doc.per_billed < 100) {
-            frappe.call({
-                method: "italian_invoice.api.delivery_note_billing_adjustment.calculate_billing_gap",
-                args: {
-                    delivery_note_name: frm.doc.name
-                }
-            });
+        if (frm.doc.docstatus === 1) {
+            console.log("Calling calculate_billing_gap for:", frm.doc.name);
+            // Aggiungi un piccolo delay per assicurarsi che il form sia completamente caricato
+            setTimeout(function() {
+                frappe.call({
+                    method: "italian_invoice.api.delivery_note_billing_adjustment.calculate_billing_gap",
+                    args: {
+                        delivery_note_name: frm.doc.name
+                    },
+                    callback: function(r) {
+                        console.log("Billing gap response:", r.message);
+                        if (r.message && r.message.billing_gap !== undefined) {
+                            console.log("Current custom_billing_gap:", frm.doc.custom_billing_gap);
+                            console.log("New billing_gap:", r.message.billing_gap);
+                            // Aggiorna il campo se il valore è cambiato
+                            if (frm.doc.custom_billing_gap != r.message.billing_gap) {
+                                console.log("Updating custom_billing_gap from", frm.doc.custom_billing_gap, "to", r.message.billing_gap);
+                                frm.set_value('custom_billing_gap', r.message.billing_gap);
+                                // Non salviamo automaticamente per evitare conflitti
+                                frm.dirty();
+                            }
+                        }
+                    },
+                    error: function(err) {
+                        console.error("Error calling calculate_billing_gap:", err);
+                    }
+                });
+            }, 500); // Delay di 500ms
         }
     }
 });
