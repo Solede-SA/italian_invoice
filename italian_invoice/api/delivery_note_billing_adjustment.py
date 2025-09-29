@@ -26,8 +26,8 @@ def calculate_billing_gap(delivery_note_name):
     can_force_complete = 0 < billing_gap < 1.0
 
     # Aggiorna il campo custom
-    if dn.billing_gap != billing_gap:
-        frappe.db.set_value("Delivery Note", delivery_note_name, "billing_gap", billing_gap)
+    if dn.custom_billing_gap != billing_gap:
+        frappe.db.set_value("Delivery Note", delivery_note_name, "custom_billing_gap", billing_gap)
 
     return {
         'total_amount': total_amount,

@@ -3,7 +3,7 @@
     {
       "dt": "Delivery Note",
       "label": "Billing Gap",
-      "fieldname": "billing_gap",
+      "fieldname": "custom_billing_gap",
       "fieldtype": "Currency",
       "insert_after": "per_billed",
       "read_only": 1,
