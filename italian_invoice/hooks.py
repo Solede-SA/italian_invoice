@@ -231,6 +231,7 @@ doctype_js = {
     "Sales Invoice": "public/js/custom_sales_invoice.js",
     "Purchase Invoice": "public/js/custom_purchase_invoice.js",
     "Quotation": "public/js/custom_quotation.js",
+    "Delivery Note": "public/js/custom_delivery_note.js",
 }
 
 doc_events = {
@@ -242,6 +243,9 @@ doc_events = {
     "Payment Entry": {
         "before_save": "italian_invoice.crud_events.payment_entry.handle_rounding",
         "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
+    },
+    "Delivery Note": {
+        "on_update_after_submit": "italian_invoice.api.delivery_note_billing_adjustment.update_billing_gap_on_save",
     },
 }
 
