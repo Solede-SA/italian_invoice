@@ -16,6 +16,12 @@ App Frappe/ERPNext per la gestione delle fatture elettroniche italiane secondo l
 - ✅ **Mapping articoli** personalizzabile per linea fattura
 - ✅ **Gestione IVA** con riconoscimento automatico aliquote
 
+### Gestione Documenti di Trasporto (DDT)
+- ✅ **Monitoraggio billing gap** per differenze di fatturazione
+- ✅ **Force billing completion** per piccole differenze (< 1 EUR)
+- ✅ **Audit log** completo per tracciabilità modifiche
+- ✅ **Reversibilità** delle operazioni di aggiustamento
+
 ### Sistema Provider
 - ✅ **Architettura pluggabile** per diversi servizi SDI
 - ✅ **Provider Manual** per test e sviluppo locale
