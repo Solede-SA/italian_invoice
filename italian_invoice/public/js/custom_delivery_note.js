@@ -132,8 +132,8 @@ frappe.ui.form.on('Delivery Note', {
                             if (frm.doc.custom_billing_gap != r.message.billing_gap) {
                                 console.log("Updating custom_billing_gap from", frm.doc.custom_billing_gap, "to", r.message.billing_gap);
                                 frm.set_value('custom_billing_gap', r.message.billing_gap);
-                                // Non salviamo automaticamente per evitare conflitti
-                                frm.dirty();
+                                // Salva automaticamente per evitare che il form rimanga "dirty"
+                                frm.save('Update');
                             }
                         }
                     },
