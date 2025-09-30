@@ -87,31 +87,21 @@ frappe.ui.form.on("Sales Invoice", {
     // Aggiungi bottone per ricalcolo manuale se ci sono payment terms
     if (frm.doc.payment_terms_template && !frm.doc.__islocal) {
         frm.add_custom_button(__('Recalculate Payment Schedule'), function() {
-            if (frm.doc.docstatus === 1) {
-                // Documento submitted: usa metodo server
-                frappe.call({
-                    method: 'italian_invoice.api.sales_invoice.recalculate_payment_schedule',
-                    args: {
-                        sales_invoice_name: frm.doc.name
-                    },
-                    callback: function(r) {
-                        if (r.message && r.message.success) {
-                            frappe.show_alert({
-                                message: __('Payment schedule recalculated'),
-                                indicator: 'green'
-                            });
-                            frm.reload_doc();
-                        }
+            frappe.call({
+                method: 'italian_invoice.api.sales_invoice.recalculate_payment_schedule',
+                args: {
+                    sales_invoice_name: frm.doc.name
+                },
+                callback: function(r) {
+                    if (r.message && r.message.success) {
+                        frappe.show_alert({
+                            message: __('Payment schedule recalculated'),
+                            indicator: 'green'
+                        });
+                        frm.reload_doc();
                     }
-                });
-            } else {
-                // Documento draft: usa metodo client
-                calculate_payment_schedule_manually(frm);
-                frappe.show_alert({
-                    message: __('Payment schedule recalculated'),
-                    indicator: 'green'
-                });
-            }
+                }
+            });
         }, __('Actions'));
     }
     
