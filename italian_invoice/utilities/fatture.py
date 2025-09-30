@@ -955,23 +955,33 @@ def identify_company_from_webhook_data(data):
 def handle_sdi_webhook(endpoint, data):
     """
     Router centrale per webhook SDI
-    Per customer-notification: usa UUID per trovare la transazione esistente
+    Per customer-notification/customer_invoice/legal_storage_receipt: usa UUID per trovare la transazione esistente
     Per supplier-invoice: identifica la company dal cessionario
     """
     try:
-        if endpoint == "customer_notification":
-            # Per notifiche, l'UUID identifica univocamente la transazione
-            # Non serve identificare la company
+        if endpoint in ["customer_notification", "customer_invoice", "legal_storage_receipt"]:
+            # Per notifiche e ricevute, l'UUID identifica univocamente la transazione
             uuid = None
 
             # Estrai UUID in base alla struttura del webhook
-            if "data" in data and "notification" in data["data"]:
-                uuid = data["data"]["notification"].get("invoice_uuid")
-            elif "notification" in data:
-                uuid = data["notification"].get("invoice_uuid")
+            if endpoint == "customer_notification":
+                if "data" in data and "notification" in data["data"]:
+                    uuid = data["data"]["notification"].get("invoice_uuid")
+                elif "notification" in data:
+                    uuid = data["notification"].get("invoice_uuid")
+            elif endpoint == "customer_invoice":
+                if "data" in data and "invoice" in data["data"]:
+                    uuid = data["data"]["invoice"].get("uuid")
+                elif "invoice" in data:
+                    uuid = data["invoice"].get("uuid")
+            elif endpoint == "legal_storage_receipt":
+                if "data" in data:
+                    uuid = data["data"].get("object_id")
+                else:
+                    uuid = data.get("object_id")
 
             if not uuid:
-                frappe.throw("UUID non trovato nel webhook customer-notification")
+                frappe.throw(f"UUID non trovato nel webhook {endpoint}")
 
             # Trova la transazione per UUID
             transazioni = frappe.get_list(
@@ -990,7 +1000,6 @@ def handle_sdi_webhook(endpoint, data):
 
         elif endpoint == "supplier_invoice":
             # Per fatture fornitori, identifica la company dal cessionario
-            # Comportamento originale: cerca con search_value_in_json
             from italian_invoice.providers.openapi_provider import OpenAPIProvider
             provider_temp = OpenAPIProvider()
 
@@ -1008,6 +1017,15 @@ def handle_sdi_webhook(endpoint, data):
                 frappe.throw(f"Company non trovata con P.IVA: {partita_iva_company}")
 
             company = frappe.get_doc("Company", company_list[0]["name"])
+
+        elif endpoint in ["invoice_status_quarantena", "invoice_status_invoice_error"]:
+            # Per questi endpoint, prova a identificare la company
+            # Se non riesci, logga e ritorna successo
+            try:
+                company = identify_company_from_webhook_data(data)
+            except:
+                frappe.log_error(f"Impossibile identificare company per {endpoint}, webhook ignorato", "SDI Webhook Warning")
+                return {"success": True, "message": f"OK from {endpoint}"}
 
         else:
             frappe.throw(f"Endpoint webhook non riconosciuto: {endpoint}")
