@@ -197,7 +197,7 @@ class OpenAPIProvider(SDIProvider):
                 receipt_data = data.get("data", data)
                 uuid = receipt_data["object_id"]
                 data_notifica = receipt_data.get("receipt_received_at", receipt_data["updated_at"])
-                stato = receipt_data.get("status", "")
+                stato = None  # Non cambiare stato per ricevute conservazione
 
             # Trova e aggiorna transazione
             if uuid:
@@ -228,8 +228,17 @@ class OpenAPIProvider(SDIProvider):
                         },
                     )
                     transazione.ultima_notifica = formatted_original_data
-                    transazione.stato_invio = stato
+
+                    # Aggiorna stato solo se presente (escluso legal-storage-receipt)
+                    if stato:
+                        transazione.stato_invio = stato
+
                     transazione.save()
+
+                    # Aggiorna Sales Invoice solo se lo stato è cambiato
+                    if stato:
+                        fattura = frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
+                        fattura.save()
 
                     return {"success": True, "message": f"Notifica {event} elaborata"}
 
