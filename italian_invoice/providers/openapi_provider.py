@@ -227,7 +227,10 @@ class OpenAPIProvider(SDIProvider):
                             "uuid": uuid,
                         },
                     )
-                    transazione.ultima_notifica = formatted_original_data
+
+                    # Aggiorna ultima_notifica solo se non è legal-storage-receipt
+                    if event != "legal-storage-receipt":
+                        transazione.ultima_notifica = formatted_original_data
 
                     # Aggiorna stato solo se presente (escluso legal-storage-receipt)
                     if stato:

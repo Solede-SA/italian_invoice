@@ -31,21 +31,32 @@ frappe.ui.form.on("Transazione SDI", {
             let notificationContainer = $('<div>').appendTo(frm.fields_dict['uuid'].wrapper);
 
             // Funzione ricorsiva per iterare attraverso l'oggetto JSON e costruire una lista puntata
-            function displayNotification(data, parentElement) {
-                let ul = $('<ul>').appendTo(parentElement);
+            function displayNotification(data, parentElement, depth = 0) {
+                let ul = $('<ul>').css('margin-left', depth > 0 ? '20px' : '0').appendTo(parentElement);
                 for (let key in data) {
                     let li = $('<li>').appendTo(ul);
                     if (typeof data[key] === 'object' && data[key] !== null) {
                         $('<strong>').text(key + ': ').appendTo(li);
-                        displayNotification(data[key], li);
+                        displayNotification(data[key], li, depth + 1);
                     } else {
-                        $('<span>').text(key + ': ' + data[key]).appendTo(li);
+                        $('<span>').html(`<strong>${key}:</strong> ${data[key]}`).appendTo(li);
                     }
                 }
             }
 
-            // Chiamata alla funzione ricorsiva
-            displayNotification(utlima_notifica["data"]["notification"], notificationContainer);
+            // Determina quale parte del JSON visualizzare in base alla struttura
+            let dataToDisplay = null;
+            if (utlima_notifica.notification) {
+                dataToDisplay = utlima_notifica.notification;
+            } else if (utlima_notifica.data && utlima_notifica.data.notification) {
+                dataToDisplay = utlima_notifica.data.notification;
+            } else if (utlima_notifica.data && utlima_notifica.data.data) {
+                dataToDisplay = utlima_notifica.data.data;
+            } else {
+                dataToDisplay = utlima_notifica;
+            }
+
+            displayNotification(dataToDisplay, notificationContainer);
         }
                 
 
