@@ -183,6 +183,10 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
         # Estrai righe fattura
         invoice_lines = extract_invoice_lines(payload)
 
+        # Verifica se è una nota di credito
+        tipo_documento = doc_data.get("tipo_documento")
+        is_return = is_credit_note(tipo_documento)
+
         # Crea Purchase Invoice
         purchase_invoice = frappe.get_doc({
             "doctype": "Purchase Invoice",
@@ -191,6 +195,7 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
             "company": company,
             "currency": doc_data.get("divisa", "EUR"),
             "is_paid": 0,
+            "is_return": 1 if is_return else 0,
             "status": "Draft",
             "from_xml": 1,
             "bill_no": doc_data["numero"],
@@ -198,11 +203,13 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
             "items": prepare_invoice_items(
                 invoice_lines,
                 item_mappings,
-                company
+                company,
+                is_return
             ),
             "taxes": prepare_invoice_taxes(
                 extract_tax_summary(payload),
-                company
+                company,
+                is_return
             ),
         })
 
@@ -248,6 +255,18 @@ def extract_supplier_vat(payload):
         return payload["cedente_prestatore"]["dati_anagrafici"]["id_fiscale_iva"]["id_codice"]
     else:
         frappe.throw("Impossibile trovare partita IVA fornitore")
+
+
+def is_credit_note(tipo_documento):
+    """Verifica se il tipo documento è una nota di credito"""
+    return tipo_documento in ["TD04", "TD05", "TD08", "TD09"]
+
+
+def invert_sign_for_credit_note(value, is_return):
+    """Inverte il segno di un valore se è una nota di credito"""
+    if not is_return:
+        return value
+    return -abs(float(value)) if value else 0
 
 
 def extract_document_data(payload):
@@ -303,7 +322,7 @@ def calculate_total_discount(invoice_lines):
     return total_discount
 
 
-def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
+def prepare_invoice_items(invoice_lines, item_mappings=None, company=None, is_return=False):
     """
     Prepara le righe della fattura di acquisto
 
@@ -311,6 +330,7 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
         invoice_lines: Lista di righe della fattura
         item_mappings: Mapping personalizzato articoli
         company: Nome della società
+        is_return: True se è una nota di credito (inverte i segni)
 
     Returns:
         Lista di dizionari per le righe Purchase Invoice
@@ -324,6 +344,12 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
 
         # Calcola quantità
         quantity = get_line_quantity(line)
+        rate = float(line.get("prezzo_unitario", 0))
+
+        # Per note di credito, inverti il segno della quantità
+        quantity = invert_sign_for_credit_note(quantity, is_return)
+        if is_return:
+            rate = abs(rate)
 
         if item_mappings and str(line.get("numero_linea")) in item_mappings:
             # Usa mapping personalizzato
@@ -334,10 +360,10 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
                 "item_code": mapping["item_code"],
                 "description": mapping.get("description", line.get("descrizione", "")),
                 "qty": quantity,
-                "rate": line.get("prezzo_unitario", 0),
+                "rate": rate,
                 "expense_account": mapping.get("account"),
                 "uom": uom,
-                "price_list_rate": line.get("prezzo_unitario", 0),
+                "price_list_rate": rate,
                 "tax_rate": line.get("aliquota_iva", 0),
                 "tax_nature": line.get("natura"),
             })
@@ -347,9 +373,9 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
                 "item_code": get_or_create_item_code(line),
                 "description": line.get("descrizione", ""),
                 "qty": quantity,
-                "rate": line.get("prezzo_unitario", 0),
+                "rate": rate,
                 "uom": get_default_uom(),
-                "price_list_rate": line.get("prezzo_unitario", 0),
+                "price_list_rate": rate,
                 "tax_rate": line.get("aliquota_iva", 0),
                 "tax_nature": line.get("natura"),
             })
@@ -375,13 +401,14 @@ def get_line_quantity(line):
     return 1
 
 
-def prepare_invoice_taxes(invoice_summary, company):
+def prepare_invoice_taxes(invoice_summary, company, is_return=False):
     """
     Prepara le tasse per la fattura di acquisto
 
     Args:
         invoice_summary: Lista di riepiloghi IVA
         company: Nome della società
+        is_return: True se è una nota di credito (inverte i segni)
 
     Returns:
         Lista di dizionari per le tasse
@@ -392,13 +419,16 @@ def prepare_invoice_taxes(invoice_summary, company):
         tax_rate = float(summary.get("aliquota_iva", 0))
         tax_account = get_tax_account(tax_rate, company)
 
+        tax_amount = invert_sign_for_credit_note(summary.get("imposta", 0), is_return)
+        total = invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return)
+
         taxes.append({
             "charge_type": "Actual",
             "account_head": tax_account,
-            "tax_amount": summary.get("imposta", 0),
+            "tax_amount": tax_amount,
             "rate": tax_rate,
             "description": f"IVA {tax_rate}%",
-            "total": summary.get("imponibile_importo", 0),
+            "total": total,
         })
 
     return taxes
