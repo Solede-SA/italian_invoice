@@ -180,6 +180,9 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
         # Estrai dati documento
         doc_data = extract_document_data(payload)
 
+        # Estrai righe fattura
+        invoice_lines = extract_invoice_lines(payload)
+
         # Crea Purchase Invoice
         purchase_invoice = frappe.get_doc({
             "doctype": "Purchase Invoice",
@@ -193,7 +196,7 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
             "bill_no": doc_data["numero"],
             "bill_date": doc_data["data"],
             "items": prepare_invoice_items(
-                extract_invoice_lines(payload),
+                invoice_lines,
                 item_mappings,
                 company
             ),
@@ -277,6 +280,29 @@ def extract_tax_summary(payload):
         return payload.get("dati_riepilogo", [])
 
 
+def calculate_total_discount(invoice_lines):
+    """
+    Calcola lo sconto totale dalle righe con importo negativo
+
+    Args:
+        invoice_lines: Lista righe fattura
+
+    Returns:
+        float: Totale sconti (valore positivo)
+    """
+    total_discount = 0.0
+
+    for line in invoice_lines:
+        try:
+            prezzo_totale = float(line.get("prezzo_totale", 0))
+            if prezzo_totale < 0:
+                total_discount += abs(prezzo_totale)
+        except (ValueError, TypeError):
+            continue
+
+    return total_discount
+
+
 def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
     """
     Prepara le righe della fattura di acquisto
@@ -333,28 +359,7 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None):
 
 def is_valid_invoice_line(line):
     """Verifica se una riga fattura è valida per l'importazione"""
-    try:
-        # Verifica quantità valida
-        if line.get("quantita"):
-            quantity = float(line.get("quantita", 0))
-            if quantity > 0:
-                return True
-
-        # Verifica prezzo totale valido (per servizi senza quantità)
-        if line.get("prezzo_totale"):
-            price_total = float(line.get("prezzo_totale", 0))
-            if price_total > 0:
-                return True
-
-        return False
-    except (ValueError, TypeError):
-        # Se c'è comunque un prezzo totale, include la riga
-        try:
-            if line.get("prezzo_totale") and float(line.get("prezzo_totale", 0)) > 0:
-                return True
-        except:
-            pass
-        return False
+    return line.get("prezzo_totale") is not None or line.get("quantita") is not None
 
 
 def get_line_quantity(line):

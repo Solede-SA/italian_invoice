@@ -353,13 +353,12 @@ class OpenAPIProvider(SDIProvider):
 
             # Crea documento fattura fornitore
             fattura_fornitore = frappe.new_doc("Fattura Fornitori SDI")
-            fattura_fornitore.dati_fattura = json.dumps(data, indent=2)
+            fattura_fornitore.dati_fattura = json.dumps({"event": "supplier-invoice", "data": data}, indent=2)
             fattura_fornitore.uuid = uuid
             fattura_fornitore.company = company
             fattura_fornitore.partita_iva_fornitore = partita_iva_fornitore
             fattura_fornitore.denominazione_fornitore = denominazione_fornitore
             fattura_fornitore.via_webhook = 1
-            fattura_fornitore.flags.ignore_validate = True
             fattura_fornitore.insert()
 
             return {"success": True, "message": "Fattura fornitore salvata"}

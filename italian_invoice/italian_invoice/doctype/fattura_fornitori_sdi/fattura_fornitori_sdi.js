@@ -47,28 +47,11 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
 
 
 function show_items_dialog(frm, json_data, supplier_data) {
-   // Filter out lines with quantity 0 or null
+   // Get all invoice lines including negative values (discounts)
    const allLines = json_data.data.invoice.payload.fattura_elettronica_body[0].dati_beni_servizi.dettaglio_linee;
    const invoice_lines = allLines.filter(line => {
-       // Check if line should be included based on quantity or total price
-       try {
-           // Include if it has a valid quantity greater than 0
-           if (line.quantita) {
-               const qty = parseFloat(line.quantita);
-               if (!isNaN(qty) && qty > 0) return true;
-           }
-           
-           // Include if quantita is null/missing but has a valid price_totale greater than 0
-           if (line.prezzo_totale) {
-               const total = parseFloat(line.prezzo_totale);
-               if (!isNaN(total) && total > 0) return true;
-           }
-           
-           // Exclude in all other cases
-           return false;
-       } catch (e) {
-           return false; // If error in parsing, filter out the line
-       }
+       // Include all lines with valid prezzo_totale or quantita (including negative values)
+       return line.prezzo_totale != null || line.quantita != null;
    });
    
    // Display info about filtered lines
