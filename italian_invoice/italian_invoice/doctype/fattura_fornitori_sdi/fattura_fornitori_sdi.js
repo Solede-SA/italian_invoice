@@ -300,6 +300,29 @@ function show_items_dialog(frm, json_data, supplier_data) {
         };
     });
 
+   // Auto-match item basato sulla descrizione
+   frappe.call({
+       method: 'italian_invoice.utilities.fatture_passive.find_matching_items',
+       args: {
+           supplier_name: supplier_data.name,
+           invoice_lines: invoice_lines
+       },
+       callback: (r) => {
+           if (r.message) {
+               // Pre-popola i campi trovati
+               invoice_lines.forEach((line, idx) => {
+                   const match = r.message[line.numero_linea];
+                   if (match) {
+                       d.set_value(`item_${idx}`, match.item_code);
+                       if (match.expense_account) {
+                           d.set_value(`account_${idx}`, match.expense_account);
+                       }
+                   }
+               });
+           }
+       }
+   });
+
    d.show();
 }
 

@@ -7,6 +7,7 @@ Indipendente dal provider SDI utilizzato
 import frappe
 import json
 from frappe import _
+from difflib import SequenceMatcher
 
 
 def get_or_create_supplier(supplier_vat_id, invoice_data):
@@ -132,6 +133,88 @@ def create_supplier(supplier_data, company):
     supplier.insert()
     supplier.save()
     return supplier.name
+
+
+@frappe.whitelist()
+def find_matching_items(supplier_name, invoice_lines):
+    """
+    Cerca item matching per le righe della fattura basandosi sulla descrizione
+
+    Args:
+        supplier_name: Nome del fornitore
+        invoice_lines: Lista di righe fattura con numero_linea e descrizione
+
+    Returns:
+        dict: {numero_linea: {"item_code": "...", "expense_account": "..."}}
+    """
+    if isinstance(invoice_lines, str):
+        invoice_lines = json.loads(invoice_lines)
+
+    matches = {}
+
+    # Ottieni tutti gli item del fornitore
+    items = frappe.get_all(
+        "Item Default",
+        filters={"default_supplier": supplier_name},
+        fields=["parent as item_code"]
+    )
+
+    if not items:
+        return matches
+
+    item_codes = [item["item_code"] for item in items]
+
+    # Ottieni dettagli degli item
+    items_details = frappe.get_all(
+        "Item",
+        filters={"name": ["in", item_codes]},
+        fields=["name", "item_name", "description"]
+    )
+
+    for line in invoice_lines:
+        line_desc = (line.get("descrizione") or "").strip().lower()
+        if not line_desc:
+            continue
+
+        best_match = None
+        best_ratio = 0.0
+
+        for item in items_details:
+            # Confronta con item_name
+            item_name = (item.get("item_name") or "").strip().lower()
+            if item_name:
+                ratio = SequenceMatcher(None, line_desc, item_name).ratio()
+                if ratio > best_ratio and ratio > 0.7:  # Soglia 70% similarità
+                    best_ratio = ratio
+                    best_match = item["name"]
+
+            # Confronta anche con description se presente
+            item_desc = (item.get("description") or "").strip().lower()
+            if item_desc:
+                ratio = SequenceMatcher(None, line_desc, item_desc).ratio()
+                if ratio > best_ratio and ratio > 0.7:
+                    best_ratio = ratio
+                    best_match = item["name"]
+
+            # Exact match ha priorità
+            if line_desc == item_name or line_desc == item_desc:
+                best_match = item["name"]
+                break
+
+        if best_match:
+            # Recupera anche il conto di costo
+            expense_account = frappe.db.get_value(
+                "Item Default",
+                {"parent": best_match, "default_supplier": supplier_name},
+                "expense_account"
+            )
+
+            matches[line.get("numero_linea")] = {
+                "item_code": best_match,
+                "expense_account": expense_account
+            }
+
+    return matches
 
 
 @frappe.whitelist()
