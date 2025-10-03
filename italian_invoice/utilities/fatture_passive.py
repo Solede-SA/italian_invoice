@@ -269,6 +269,337 @@ def invert_sign_for_credit_note(value, is_return):
     return -abs(float(value)) if value else 0
 
 
+def link_item_to_purchase_document(item_dict, purchase_doc_name, purchase_doctype):
+    """
+    Collega una riga di Purchase Invoice a un Purchase Order o Purchase Receipt
+
+    Args:
+        item_dict: Dizionario della riga item
+        purchase_doc_name: Nome del documento PO/PR
+        purchase_doctype: "Purchase Order" o "Purchase Receipt"
+    """
+    if not purchase_doc_name or purchase_doctype not in ["Purchase Order", "Purchase Receipt"]:
+        return
+
+    # Campi da popolare in base al doctype
+    if purchase_doctype == "Purchase Order":
+        item_dict["purchase_order"] = purchase_doc_name
+        # Trova la riga specifica nel PO che corrisponde all'item
+        po_item = frappe.db.get_value(
+            "Purchase Order Item",
+            {
+                "parent": purchase_doc_name,
+                "item_code": item_dict.get("item_code"),
+                "docstatus": 1
+            },
+            "name"
+        )
+        if po_item:
+            item_dict["po_detail"] = po_item
+    else:  # Purchase Receipt
+        item_dict["purchase_receipt"] = purchase_doc_name
+        # Trova la riga specifica nel PR che corrisponde all'item
+        pr_item = frappe.db.get_value(
+            "Purchase Receipt Item",
+            {
+                "parent": purchase_doc_name,
+                "item_code": item_dict.get("item_code"),
+                "docstatus": 1
+            },
+            "name"
+        )
+        if pr_item:
+            item_dict["pr_detail"] = pr_item
+
+
+@frappe.whitelist()
+def get_open_purchase_documents_summary(supplier_vat):
+    """
+    Recupera sommario di PO/PR aperti per un fornitore (per alert nel form)
+
+    Args:
+        supplier_vat: Partita IVA fornitore
+
+    Returns:
+        dict: {"purchase_orders": [...], "purchase_receipts": [...]}
+    """
+    result = {
+        "purchase_orders": [],
+        "purchase_receipts": []
+    }
+
+    # Trova fornitore dalla partita IVA
+    supplier_list = frappe.get_list("Supplier", filters={"tax_id": supplier_vat}, fields=["name"])
+    if not supplier_list:
+        return result
+
+    supplier = supplier_list[0]["name"]
+
+    # Purchase Orders aperti
+    pos = frappe.db.sql("""
+        SELECT DISTINCT
+            parent.name,
+            parent.transaction_date,
+            parent.grand_total
+        FROM `tabPurchase Order` parent
+        INNER JOIN `tabPurchase Order Item` item ON item.parent = parent.name
+        WHERE parent.supplier = %(supplier)s
+        AND parent.docstatus = 1
+        AND parent.status NOT IN ('Closed', 'Completed', 'Cancelled')
+        AND (item.billed_amt < item.amount OR item.billed_amt IS NULL)
+        ORDER BY parent.transaction_date DESC
+        LIMIT 10
+    """, {"supplier": supplier}, as_dict=True)
+    result["purchase_orders"] = pos
+
+    # Purchase Receipts aperti
+    prs = frappe.db.sql("""
+        SELECT DISTINCT
+            parent.name,
+            parent.posting_date,
+            parent.grand_total
+        FROM `tabPurchase Receipt` parent
+        INNER JOIN `tabPurchase Receipt Item` item ON item.parent = parent.name
+        WHERE parent.supplier = %(supplier)s
+        AND parent.docstatus = 1
+        AND parent.status NOT IN ('Closed', 'Completed', 'Cancelled')
+        AND (item.billed_amt < item.amount OR item.billed_amt IS NULL)
+        ORDER BY parent.posting_date DESC
+        LIMIT 10
+    """, {"supplier": supplier}, as_dict=True)
+    result["purchase_receipts"] = prs
+
+    return result
+
+
+@frappe.whitelist()
+def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sdi_name):
+    """
+    Crea una Purchase Invoice da un Purchase Order o Purchase Receipt
+
+    Args:
+        doc_name: Nome del PO/PR
+        doctype: "Purchase Order" o "Purchase Receipt"
+        bill_no: Numero fattura da impostare
+        fattura_sdi_name: Nome della Fattura Fornitori SDI
+
+    Returns:
+        Nome della Purchase Invoice creata
+    """
+    if doctype == "Purchase Order":
+        from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice
+        pi = make_purchase_invoice(doc_name)
+    elif doctype == "Purchase Receipt":
+        from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_invoice
+        pi = make_purchase_invoice(doc_name)
+    else:
+        frappe.throw(f"Doctype non supportato: {doctype}")
+
+    # Imposta bill_no
+    pi.bill_no = bill_no
+
+    # Estrai data fattura dalla Fattura Fornitori SDI
+    fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
+    bill_date = _get_bill_date_from_fattura_sdi(fattura_sdi)
+    if bill_date:
+        pi.bill_date = bill_date
+
+    # Salva (ma non submit)
+    pi.insert()
+    frappe.db.commit()
+
+    return pi.name
+
+
+def _get_bill_date_from_fattura_sdi(fattura_sdi):
+    """Estrae la data fattura dai dati JSON della Fattura Fornitori SDI"""
+    from italian_invoice.italian_invoice.doctype.fattura_fornitori_sdi.fattura_fornitori_sdi import _get_fattura_body_from_json
+
+    body = _get_fattura_body_from_json(fattura_sdi.dati_fattura)
+    if not body:
+        return None
+
+    return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("data")
+
+
+@frappe.whitelist()
+def prepare_purchase_document_for_invoice(doc_name, doctype, bill_no):
+    """
+    Popola bill_no in un PO/PR per prepararlo alla creazione della PI
+
+    Args:
+        doc_name: Nome del PO/PR
+        doctype: "Purchase Order" o "Purchase Receipt"
+        bill_no: Numero fattura da settare
+
+    Returns:
+        dict: URL del documento
+    """
+    if doctype not in ["Purchase Order", "Purchase Receipt"]:
+        frappe.throw("Doctype non valido")
+
+    # Il bill_no verrà copiato automaticamente quando si crea la PI dal PO/PR
+    # Non serve modificare il PO/PR qui, lo gestiamo nella creazione PI
+
+    return {
+        "success": True,
+        "url": f"/app/{doctype.lower().replace(' ', '-')}/{doc_name}"
+    }
+
+
+def find_fattura_sdi_by_bill_no(bill_no, supplier=None):
+    """
+    Trova una Fattura Fornitori SDI dal numero fattura (DRY)
+
+    Args:
+        bill_no: Numero fattura
+        supplier: Partita IVA fornitore (opzionale)
+
+    Returns:
+        Nome della Fattura Fornitori SDI o None
+    """
+    filters = {"dati_fattura": ["like", f'%"numero": "{bill_no}"%']}
+    if supplier:
+        filters["partita_iva_fornitore"] = supplier
+
+    fatture = frappe.get_list(
+        "Fattura Fornitori SDI",
+        filters=filters,
+        fields=["name"],
+        limit=1
+    )
+
+    return fatture[0]["name"] if fatture else None
+
+
+def link_purchase_invoice_to_fattura_sdi(purchase_invoice_name, fattura_sdi_name):
+    """
+    Collega una Purchase Invoice a una Fattura SDI (DRY)
+
+    Args:
+        purchase_invoice_name: Nome Purchase Invoice
+        fattura_sdi_name: Nome Fattura Fornitori SDI
+    """
+    fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
+    fattura_sdi.fattura = purchase_invoice_name
+    fattura_sdi.stato = "Importata"
+    fattura_sdi.save(ignore_permissions=True)
+    frappe.db.commit()
+
+
+def unlink_purchase_invoice_from_fattura_sdi(purchase_invoice_name):
+    """
+    Scollega una Purchase Invoice da Fattura SDI (DRY)
+
+    Args:
+        purchase_invoice_name: Nome Purchase Invoice
+    """
+    fatture = frappe.get_list(
+        "Fattura Fornitori SDI",
+        filters={"fattura": purchase_invoice_name},
+        fields=["name"]
+    )
+
+    for fattura in fatture:
+        doc = frappe.get_doc("Fattura Fornitori SDI", fattura["name"])
+        doc.fattura = None
+        doc.stato = "Da importare"
+        doc.save(ignore_permissions=True)
+
+    frappe.db.commit()
+
+
+def on_purchase_invoice_submit(doc, method):
+    """
+    Hook chiamato quando una Purchase Invoice viene submitted
+    Collega automaticamente alla Fattura Fornitori SDI se esiste
+
+    Args:
+        doc: Purchase Invoice document
+        method: Nome del metodo (on_submit)
+    """
+    if not doc.bill_no:
+        return
+
+    # Ottieni partita IVA del fornitore
+    supplier_tax_id = frappe.db.get_value("Supplier", doc.supplier, "tax_id")
+    if not supplier_tax_id:
+        return
+
+    # Cerca Fattura SDI con questo numero per questo fornitore
+    fattura_sdi_name = find_fattura_sdi_by_bill_no(doc.bill_no, supplier_tax_id)
+
+    if fattura_sdi_name:
+        link_purchase_invoice_to_fattura_sdi(doc.name, fattura_sdi_name)
+        frappe.msgprint(
+            f"Fattura collegata automaticamente a Fattura Fornitori SDI: {fattura_sdi_name}",
+            alert=True,
+            indicator="green"
+        )
+
+
+def on_purchase_invoice_cancel(doc, method):
+    """
+    Hook chiamato quando una Purchase Invoice viene cancellata
+    Scollega dalla Fattura Fornitori SDI
+
+    Args:
+        doc: Purchase Invoice document
+        method: Nome del metodo (on_cancel)
+    """
+    unlink_purchase_invoice_from_fattura_sdi(doc.name)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_open_purchase_documents(doctype, txt, searchfield, start, page_len, filters):
+    """
+    Query function per Link field - recupera PO/PR aperti per un fornitore
+
+    Args:
+        doctype: Doctype target (viene passato automaticamente da Frappe)
+        txt: Testo di ricerca
+        searchfield: Campo di ricerca
+        start: Offset per paginazione
+        page_len: Numero risultati per pagina
+        filters: Filtri aggiuntivi (supplier, doctype)
+
+    Returns:
+        Lista di tuple [[name, details], ...]
+    """
+    target_doctype = filters.get("doctype")
+    supplier = filters.get("supplier")
+
+    if not target_doctype or target_doctype not in ["Purchase Order", "Purchase Receipt"]:
+        return []
+
+    # Campi diversi per PO e PR (DRY)
+    date_field = "transaction_date" if target_doctype == "Purchase Order" else "posting_date"
+    item_doctype = f"{target_doctype} Item"
+
+    # Query per trovare documenti con righe non completamente fatturate
+    return frappe.db.sql("""
+        SELECT DISTINCT
+            parent.name,
+            CONCAT(parent.name, ' (', DATE_FORMAT(parent.{date_field}, '%%d/%%m/%%Y'), ' - ',
+                   FORMAT(parent.grand_total, 2), ' EUR)')
+        FROM `tab{doctype}` parent
+        INNER JOIN `tab{item_doctype}` item ON item.parent = parent.name
+        WHERE parent.supplier = %(supplier)s
+        AND parent.docstatus = 1
+        AND parent.status NOT IN ('Closed', 'Completed', 'Cancelled')
+        AND (item.billed_amt < item.amount OR item.billed_amt IS NULL)
+        AND parent.name LIKE %(txt)s
+        ORDER BY parent.{date_field} DESC
+        LIMIT %(start)s, %(page_len)s
+    """.format(doctype=target_doctype, item_doctype=item_doctype, date_field=date_field), {
+        "supplier": supplier,
+        "txt": f"%{txt}%",
+        "start": start,
+        "page_len": page_len
+    })
+
+
 def extract_document_data(payload):
     """Estrae dati generali documento"""
     if "fattura_elettronica_body" in payload:
@@ -356,7 +687,7 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None, is_re
             mapping = item_mappings[str(line["numero_linea"])]
             uom = frappe.db.get_value("Item", mapping["item_code"], "stock_uom") or "Nr"
 
-            items.append({
+            item_dict = {
                 "item_code": mapping["item_code"],
                 "description": mapping.get("description", line.get("descrizione", "")),
                 "qty": quantity,
@@ -366,7 +697,17 @@ def prepare_invoice_items(invoice_lines, item_mappings=None, company=None, is_re
                 "price_list_rate": rate,
                 "tax_rate": line.get("aliquota_iva", 0),
                 "tax_nature": line.get("natura"),
-            })
+            }
+
+            # Collega a Purchase Order se specificato
+            if mapping.get("purchase_order"):
+                link_item_to_purchase_document(item_dict, mapping["purchase_order"], "Purchase Order")
+
+            # Collega a Purchase Receipt se specificato
+            if mapping.get("purchase_receipt"):
+                link_item_to_purchase_document(item_dict, mapping["purchase_receipt"], "Purchase Receipt")
+
+            items.append(item_dict)
         else:
             # Crea riga automatica
             items.append({

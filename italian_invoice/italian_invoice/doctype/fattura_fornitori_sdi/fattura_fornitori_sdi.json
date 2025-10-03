@@ -7,10 +7,13 @@
  "field_order": [
   "denominazione_fornitore",
   "fattura",
+  "importo_totale",
   "column_break_tcxn",
   "partita_iva_fornitore",
   "stato",
+  "numero_fattura",
   "section_break_ndmu",
+  "documenti_aperti",
   "uuid",
   "dati_fattura",
   "company",
@@ -44,7 +47,6 @@
    "fieldname": "partita_iva_fornitore",
    "fieldtype": "Data",
    "in_filter": 1,
-   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Partita Iva Fornitore",
    "no_copy": 1
@@ -67,13 +69,34 @@
    "fieldtype": "Section Break"
   },
   {
+   "fieldname": "documenti_aperti",
+   "fieldtype": "HTML",
+   "label": "Documenti Aperti"
+  },
+  {
    "default": "Da importare",
    "fieldname": "stato",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Stato",
-   "options": "Da importare\nImportata"
+   "options": "Da importare\nImportata",
+   "read_only": 1
+  },
+  {
+   "fieldname": "numero_fattura",
+   "fieldtype": "Data",
+   "label": "Numero Fattura",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "importo_totale",
+   "fieldtype": "Currency",
+   "label": "Importo Totale",
+   "read_only": 1,
+   "in_list_view": 1,
+   "precision": 2
   },
   {
    "fieldname": "fattura",

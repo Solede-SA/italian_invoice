@@ -12,36 +12,47 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
             window.location.href = `/api/method/openapi.api.sdi.fatture.download?doctype=Fattura Fornitori SDI&docname=${frm.doc.name}&type=pdf`;
         });
 
-        frm.add_custom_button(__("Importa Fattura"), () => {
-            const json_data = JSON.parse(frm.doc.dati_fattura);
-            const supplier_vat = json_data.data.invoice.payload.fattura_elettronica_header.cedente_prestatore.dati_anagrafici.id_fiscale_iva.id_codice;
+        // Pulisci campo documenti aperti
+        frm.get_field('documenti_aperti').$wrapper.html('');
 
-            // Prima verifichiamo/creiamo il fornitore
-            frappe.call({
-                method: "openapi.api.eInvoice.purchase_invoice.get_or_create_supplier",
-                args: {
-                    supplier_vat_id: supplier_vat,
-                    fattura_fornitori_sdi: frm.doc.name
-                },
-                callback: (r) => {
-                    if (!r.message.success) {
-                        frappe.throw(r.message.error);
-                        return;
+        // Verifica PO/PR aperti prima di mostrare il pulsante Importa
+        if (frm.doc.stato === "Da importare" && frm.doc.partita_iva_fornitore) {
+            check_open_purchase_documents(frm);
+        }
+
+        // Mostra pulsante Importa solo se non è già importata
+        if (frm.doc.stato === "Da importare") {
+            frm.add_custom_button(__("Importa Fattura"), () => {
+                const json_data = JSON.parse(frm.doc.dati_fattura);
+                const supplier_vat = json_data.data.invoice.payload.fattura_elettronica_header.cedente_prestatore.dati_anagrafici.id_fiscale_iva.id_codice;
+
+                // Prima verifichiamo/creiamo il fornitore
+                frappe.call({
+                    method: "openapi.api.eInvoice.purchase_invoice.get_or_create_supplier",
+                    args: {
+                        supplier_vat_id: supplier_vat,
+                        fattura_fornitori_sdi: frm.doc.name
+                    },
+                    callback: (r) => {
+                        if (!r.message.success) {
+                            frappe.throw(r.message.error);
+                            return;
+                        }
+
+                        const supplier_data = r.message.supplier_data;
+                        if (r.message.is_new) {
+                            frappe.show_alert({
+                                message: __(`Nuovo fornitore ${supplier_data.supplier_name} creato`),
+                                indicator: 'green'
+                            });
+                        }
+
+                        // Ora possiamo procedere con il dialog per i prodotti...
+                        show_items_dialog(frm, json_data, supplier_data);
                     }
-
-                    const supplier_data = r.message.supplier_data;
-                    if (r.message.is_new) {
-                        frappe.show_alert({
-                            message: __(`Nuovo fornitore ${supplier_data.supplier_name} creato`),
-                            indicator: 'green'
-                        });
-                    }
-
-                    // Ora possiamo procedere con il dialog per i prodotti...
-                    show_items_dialog(frm, json_data, supplier_data);
-                }
+                });
             });
-        });
+        }
     }
 });
 
@@ -83,6 +94,9 @@ function show_items_dialog(frm, json_data, supplier_data) {
    ];
 
    invoice_lines.forEach((line, idx) => {
+       // Verifica se la riga ha valore zero
+       const isZeroValue = parseFloat(line.prezzo_totale || 0) === 0;
+
        dialog_fields.push({
            fieldtype: 'Section Break'
        });
@@ -93,7 +107,7 @@ function show_items_dialog(frm, json_data, supplier_data) {
            fieldname: `desc_${idx}`,
            read_only: 1,
            default: line.descrizione,
-           description: `Importo: ${line.prezzo_unitario} EUR`
+           description: `Importo: ${line.prezzo_totale} EUR${isZeroValue ? ' (Opzionale - valore zero)' : ''}`
        });
 
        dialog_fields.push({
@@ -108,9 +122,9 @@ function show_items_dialog(frm, json_data, supplier_data) {
                    }
                };
            },
-           reqd: 1,
+           reqd: isZeroValue ? 0 : 1,
            only_select: true,
-           description: 'Seleziona un prodotto esistente o creane uno nuovo'
+           description: isZeroValue ? 'Opzionale - lascia vuoto per non importare' : 'Seleziona un prodotto esistente o creane uno nuovo'
        });
 
        dialog_fields.push({
@@ -118,12 +132,48 @@ function show_items_dialog(frm, json_data, supplier_data) {
            fieldtype: 'Link',
            options: 'Account',
            fieldname: `account_${idx}`,
-           reqd: 1,
+           reqd: isZeroValue ? 0 : 1,
            get_query: () => {
                return {
                    filters: {
                        'is_group': 0,
                        'company': frm.doc.company
+                   }
+               };
+           }
+       });
+
+       // Collegamento a Purchase Order (opzionale)
+       dialog_fields.push({
+           label: 'Purchase Order',
+           fieldtype: 'Link',
+           options: 'Purchase Order',
+           fieldname: `purchase_order_${idx}`,
+           description: 'Collega a un Purchase Order esistente (opzionale)',
+           get_query: () => {
+               return {
+                   query: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents',
+                   filters: {
+                       supplier: supplier_data.name,
+                       doctype: 'Purchase Order'
+                   }
+               };
+           }
+       });
+
+       // Collegamento a Purchase Receipt (opzionale)
+       dialog_fields.push({
+           label: 'Purchase Receipt',
+           fieldtype: 'Link',
+           options: 'Purchase Receipt',
+           fieldname: `purchase_receipt_${idx}`,
+           description: 'Collega a un Purchase Receipt esistente (opzionale)',
+           get_query: () => {
+               return {
+                   query: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents',
+                   filters: {
+                       supplier: supplier_data.name,
+                       doctype: 'Purchase Receipt'
                    }
                };
            }
@@ -221,6 +271,11 @@ function show_items_dialog(frm, json_data, supplier_data) {
         primary_action(values) {
             let item_mappings = {};
             invoice_lines.forEach((line, idx) => {
+                // Salta righe senza item_code (opzionali non compilate)
+                if (!values[`item_${idx}`]) {
+                    return;
+                }
+
                 // Make sure we use the original line number
                 item_mappings[line.numero_linea] = {
                     item_code: values[`item_${idx}`],
@@ -229,7 +284,9 @@ function show_items_dialog(frm, json_data, supplier_data) {
                     qty: parseFloat(line.quantita) || 1, // Convert to number and ensure no zeros
                     rate: line.prezzo_unitario,
                     tax_rate: line.aliquota_iva,
-                    tax_nature: line.natura
+                    tax_nature: line.natura,
+                    purchase_order: values[`purchase_order_${idx}`] || null,
+                    purchase_receipt: values[`purchase_receipt_${idx}`] || null
                 };
             });
 
@@ -270,4 +327,135 @@ function show_items_dialog(frm, json_data, supplier_data) {
     });
 
    d.show();
+}
+
+
+function check_open_purchase_documents(frm) {
+    // Ottieni numero fattura per bill_no
+    const json_data = JSON.parse(frm.doc.dati_fattura);
+    const bill_no = json_data.data.invoice.payload.fattura_elettronica_body[0].dati_generali.dati_generali_documento.numero;
+
+    frappe.call({
+        method: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents_summary',
+        args: {
+            supplier_vat: frm.doc.partita_iva_fornitore
+        },
+        callback: (r) => {
+            if (r.message) {
+                const pos = r.message.purchase_orders || [];
+                const prs = r.message.purchase_receipts || [];
+                const total = pos.length + prs.length;
+
+                if (total > 0) {
+                    show_po_pr_in_form(frm, pos, prs, bill_no);
+                } else {
+                    frm.get_field('documenti_aperti').$wrapper.html('');
+                }
+            }
+        }
+    });
+}
+
+
+function show_po_pr_in_form(frm, purchase_orders, purchase_receipts, bill_no) {
+    const total = purchase_orders.length + purchase_receipts.length;
+    let html = `
+        <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
+            <h5 style="margin-top: 0; color: #856404;">
+                <i class="fa fa-exclamation-triangle"></i>
+                Attenzione! Ci sono <b>${total} documenti aperti</b> per questo fornitore
+            </h5>
+    `;
+
+    if (purchase_orders.length > 0) {
+        html += `
+            <div style="margin-bottom: 20px;">
+                <b>Purchase Orders (${purchase_orders.length}):</b>
+                <table class="table table-bordered" style="margin-top: 10px; background-color: white;">
+                    <thead>
+                        <tr>
+                            <th style="width: 50%;">Documento</th>
+                            <th style="width: 30%; text-align: right;">Importo</th>
+                            <th style="width: 20%; text-align: center;">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        purchase_orders.forEach(po => {
+            html += `
+                <tr>
+                    <td>${po.name}</td>
+                    <td style="text-align: right;">${frappe.format(po.grand_total, {fieldtype: 'Currency'})}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-primary btn-sm" onclick="window.create_from_doc_${frm.doc.name.replace(/[^a-zA-Z0-9]/g, '_')}('${po.name}', 'Purchase Order', '${bill_no}')">Crea Fattura</button>
+                    </td>
+                </tr>
+            `;
+        });
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    if (purchase_receipts.length > 0) {
+        html += `
+            <div>
+                <b>Purchase Receipts (${purchase_receipts.length}):</b>
+                <table class="table table-bordered" style="margin-top: 10px; background-color: white;">
+                    <thead>
+                        <tr>
+                            <th style="width: 50%;">Documento</th>
+                            <th style="width: 30%; text-align: right;">Importo</th>
+                            <th style="width: 20%; text-align: center;">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        purchase_receipts.forEach(pr => {
+            html += `
+                <tr>
+                    <td>${pr.name}</td>
+                    <td style="text-align: right;">${frappe.format(pr.grand_total, {fieldtype: 'Currency'})}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-primary btn-sm" onclick="window.create_from_doc_${frm.doc.name.replace(/[^a-zA-Z0-9]/g, '_')}('${pr.name}', 'Purchase Receipt', '${bill_no}')">Crea Fattura</button>
+                    </td>
+                </tr>
+            `;
+        });
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+
+    // Funzione globale per gestire il click sui bottoni
+    const funcName = `create_from_doc_${frm.doc.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    window[funcName] = (doc_name, doctype, bill_no) => {
+        frappe.call({
+            method: 'italian_invoice.utilities.fatture_passive.create_purchase_invoice_from_document',
+            args: {
+                doc_name: doc_name,
+                doctype: doctype,
+                bill_no: bill_no,
+                fattura_sdi_name: frm.doc.name
+            },
+            callback: (r) => {
+                if (r.message) {
+                    frappe.show_alert({
+                        message: __('Purchase Invoice creata con successo'),
+                        indicator: 'green'
+                    });
+                    frappe.set_route('Form', 'Purchase Invoice', r.message);
+                }
+            }
+        });
+    };
+
+    // Popola il campo HTML
+    frm.get_field('documenti_aperti').$wrapper.html(html);
 }

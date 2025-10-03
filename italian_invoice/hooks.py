@@ -244,6 +244,10 @@ doc_events = {
         "before_save": "italian_invoice.crud_events.payment_entry.handle_rounding",
         "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
     },
+    "Purchase Invoice": {
+        "on_submit": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_submit",
+        "on_cancel": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_cancel",
+    },
 }
 
 fixtures = [
