@@ -101,13 +101,25 @@ function show_items_dialog(frm, json_data, supplier_data) {
            fieldtype: 'Section Break'
        });
 
+       const importo_formatted = frappe.format(line.prezzo_totale, {fieldtype: 'Currency'});
+       const html_desc = `
+           <div style="margin-bottom: 5px;">
+               <strong>Prodotto presente in Fattura</strong>
+           </div>
+           <div style="padding: 10px; background-color: #f8f9fa; border-radius: 4px; margin-bottom: 10px;">
+               <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">${line.descrizione}</div>
+               <div style="font-size: 13px; color: #6c757d;">
+                   Importo: <span style="font-weight: bold; color: ${isZeroValue ? '#ffc107' : '#28a745'};">${importo_formatted}</span>
+                   ${isZeroValue ? '<span style="color: #ffc107; margin-left: 10px;">(Opzionale - valore zero)</span>' : ''}
+               </div>
+           </div>
+       `;
+
        dialog_fields.push({
-           label: 'Prodotto in Fattura',
-           fieldtype: 'Data',
+           label: 'Prodotto presente in Fattura',
+           fieldtype: 'HTML',
            fieldname: `desc_${idx}`,
-           read_only: 1,
-           default: line.descrizione,
-           description: `Importo: ${line.prezzo_totale} EUR${isZeroValue ? ' (Opzionale - valore zero)' : ''}`
+           options: html_desc
        });
 
        dialog_fields.push({
@@ -138,42 +150,6 @@ function show_items_dialog(frm, json_data, supplier_data) {
                    filters: {
                        'is_group': 0,
                        'company': frm.doc.company
-                   }
-               };
-           }
-       });
-
-       // Collegamento a Purchase Order (opzionale)
-       dialog_fields.push({
-           label: 'Purchase Order',
-           fieldtype: 'Link',
-           options: 'Purchase Order',
-           fieldname: `purchase_order_${idx}`,
-           description: 'Collega a un Purchase Order esistente (opzionale)',
-           get_query: () => {
-               return {
-                   query: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents',
-                   filters: {
-                       supplier: supplier_data.name,
-                       doctype: 'Purchase Order'
-                   }
-               };
-           }
-       });
-
-       // Collegamento a Purchase Receipt (opzionale)
-       dialog_fields.push({
-           label: 'Purchase Receipt',
-           fieldtype: 'Link',
-           options: 'Purchase Receipt',
-           fieldname: `purchase_receipt_${idx}`,
-           description: 'Collega a un Purchase Receipt esistente (opzionale)',
-           get_query: () => {
-               return {
-                   query: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents',
-                   filters: {
-                       supplier: supplier_data.name,
-                       doctype: 'Purchase Receipt'
                    }
                };
            }
@@ -284,9 +260,7 @@ function show_items_dialog(frm, json_data, supplier_data) {
                     qty: parseFloat(line.quantita) || 1, // Convert to number and ensure no zeros
                     rate: line.prezzo_unitario,
                     tax_rate: line.aliquota_iva,
-                    tax_nature: line.natura,
-                    purchase_order: values[`purchase_order_${idx}`] || null,
-                    purchase_receipt: values[`purchase_receipt_${idx}`] || null
+                    tax_nature: line.natura
                 };
             });
 
