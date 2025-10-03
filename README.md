@@ -15,6 +15,10 @@ App Frappe/ERPNext per la gestione delle fatture elettroniche italiane secondo l
 - ✅ **Creazione Supplier** automatica o matching esistenti
 - ✅ **Mapping articoli** personalizzabile per linea fattura
 - ✅ **Gestione IVA** con riconoscimento automatico aliquote
+- ✅ **Auto-link intelligente** Purchase Invoice ↔ Fattura SDI basato su bill_no + tax_id
+- ✅ **Integrazione PO/PR** con visualizzazione documenti aperti e creazione diretta fatture
+- ✅ **Sincronizzazione stato** automatica tra Purchase Invoice e Fattura SDI
+- ✅ **UI ottimizzata** per importazione manuale con preview prodotti formattata
 
 ### Gestione Documenti di Trasporto (DDT)
 - ✅ **Monitoraggio billing gap** per differenze di fatturazione
@@ -87,11 +91,28 @@ Italian Invoice si integra perfettamente con ERPNext estendendo le funzionalità
 5. **Tracking** → Notifiche SDI in "Transazione SDI"
 
 ### Workflow Fatturazione Passiva
-1. **Ricezione XML** → Via webhook o upload manuale
-2. **Parsing automatico** → Estrazione dati da XML
-3. **Creazione/Match Supplier** → Basato su P.IVA
-4. **Creazione Purchase Invoice** → Con mapping articoli
-5. **Contabilizzazione** → Standard ERPNext
+
+#### Flusso Standard
+1. **Ricezione XML** → Via webhook o upload manuale in Fattura Fornitori SDI
+2. **Parsing automatico** → Estrazione dati da XML (numero, importo, fornitore, righe)
+3. **Visualizzazione PO/PR aperti** → Se esistono documenti aperti per il fornitore
+4. **Creazione Purchase Invoice** → Manuale o da PO/PR esistente
+5. **Auto-link e sincronizzazione** → Collegamento automatico tramite bill_no + tax_id
+6. **Aggiornamento stato** → Fattura SDI passa a "Importata" automaticamente
+
+#### Creazione da PO/PR (Opzionale)
+Quando apri una Fattura SDI con stato "Da importare":
+- Il sistema mostra automaticamente eventuali **Purchase Orders** e **Purchase Receipts** aperti per quel fornitore
+- Puoi creare la Purchase Invoice direttamente dal documento con un click
+- I dati della fattura (bill_no, bill_date) vengono auto-popolati dalla Fattura SDI
+- Gli articoli vengono precompilati dal PO/PR selezionato
+
+#### Auto-link Intelligente
+Quando effettui il submit di una Purchase Invoice:
+- Il sistema cerca automaticamente una Fattura SDI con stesso `bill_no` per quel fornitore (tramite tax_id)
+- Se trovata, la Purchase Invoice viene collegata alla Fattura SDI
+- Lo stato della Fattura SDI passa automaticamente a "Importata"
+- In caso di cancellazione della PI, il link viene rimosso e lo stato torna a "Da importare"
 
 ## 📝 Utilizzo
 
@@ -115,16 +136,39 @@ Italian Invoice si integra perfettamente con ERPNext estendendo le funzionalità
 #### Via UI (Manuale)
 1. Vai in **Fattura Fornitori SDI** → Nuovo
 2. Carica il file XML della fattura
-3. Il sistema estrae automaticamente i dati
-4. Clicca **"Importa in Purchase Invoice"**
-5. Mappa gli articoli se necessario
-6. Conferma la creazione
+3. Il sistema estrae automaticamente:
+   - Partita IVA e denominazione fornitore
+   - Numero fattura e importo totale
+   - Righe prodotti/servizi con importi
+4. **Se esistono PO/PR aperti** per il fornitore, vengono mostrati in una tabella con:
+   - Numero documento e importo
+   - Pulsante "Crea Fattura" per creazione diretta
+5. **Importazione Manuale**: Clicca "Importa Fattura" per:
+   - Creare/selezionare il fornitore
+   - Mappare manualmente gli articoli con preview formattata
+   - Creare la Purchase Invoice
+
+#### Importazione da PO/PR Esistenti
+1. Dalla Fattura SDI, clicca "Crea Fattura" sul PO/PR desiderato
+2. Il sistema crea automaticamente la Purchase Invoice con:
+   - Righe precompilate dal documento origine
+   - Bill No e Bill Date dalla Fattura SDI
+3. Completa eventuali dati mancanti e fai il submit
+4. L'auto-link collega automaticamente la PI alla Fattura SDI
 
 #### Via API (Automatico con OpenAPI)
 ```python
 # Le fatture arrivano automaticamente via webhook
 # e vengono processate in background
 ```
+
+#### UI Migliorata per Mapping Prodotti
+Durante l'importazione manuale, ogni prodotto viene mostrato con:
+- **Titolo**: "Prodotto presente in Fattura"
+- **Descrizione**: Nome del prodotto in grassetto
+- **Importo**: Formattato con colori (verde = normale, giallo = valore zero)
+- **Campi di selezione**: Item e Conto di costo con auto-completamento
+- **Pulsante**: "Crea Nuovo Item" per articoli non esistenti
 
 ### Provider Manual (Default)
 
@@ -197,8 +241,12 @@ Traccia lo stato di ogni fattura inviata al SDI:
 Buffer per fatture passive ricevute:
 - **Dati Fattura**: JSON completo del XML parseato
 - **P.IVA/Denominazione**: Dati fornitore per matching
-- **Stato**: Da importare/Importata
+- **Numero Fattura**: Auto-estratto dal JSON (read-only, visibile in list view)
+- **Importo Totale**: Somma imponibili auto-calcolata (read-only)
+- **Stato**: Da importare/Importata (read-only, gestito automaticamente)
+- **Documenti Aperti**: Campo HTML che mostra PO/PR aperti con pulsanti azione
 - **UUID**: Identificativo SDI della fattura
+- **Purchase Invoice**: Link auto-popolato quando viene creata la PI collegata
 
 #### Stato Fattura Elettronica
 Master data degli stati SDI (es. "Inviata", "Consegnata", "MC - Mancata Consegna")
@@ -329,10 +377,43 @@ ERPNext Invoice → italian_invoice.get_xml() → XMLInvoiceValidator → Provid
 #### Fatturazione Passiva
 ```
 SDI → Webhook/Upload → Fattura Fornitori SDI → Parse XML → Purchase Invoice
-                                                    ↓
-                                            Supplier Creation/Match
-                                                    ↓
-                                              Item Mapping
+                                ↓                               ↓
+                        PO/PR Detection                   on_submit hook
+                                ↓                               ↓
+                        UI: Crea Fattura                Auto-link by bill_no
+                                                                ↓
+                                                        Update Fattura SDI
+                                                        stato → "Importata"
+```
+
+### Hooks e Auto-link
+
+Il sistema utilizza hooks di Frappe per gestire automaticamente la sincronizzazione:
+
+#### on_submit (Purchase Invoice)
+```python
+# italian_invoice/utilities/fatture_passive.py
+def on_purchase_invoice_submit(doc, method):
+    # Cerca Fattura SDI con stesso bill_no per questo fornitore
+    # Basato su: bill_no + supplier.tax_id
+    # Se trovata: collega PI e aggiorna stato a "Importata"
+```
+
+#### on_cancel (Purchase Invoice)
+```python
+def on_purchase_invoice_cancel(doc, method):
+    # Rimuove il link dalla Fattura SDI
+    # Riporta stato a "Da importare"
+```
+
+Questi hooks sono configurati in `hooks.py`:
+```python
+doc_events = {
+    "Purchase Invoice": {
+        "on_submit": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_submit",
+        "on_cancel": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_cancel",
+    }
+}
 ```
 
 ## 🔄 Migrazione da Versioni Precedenti
