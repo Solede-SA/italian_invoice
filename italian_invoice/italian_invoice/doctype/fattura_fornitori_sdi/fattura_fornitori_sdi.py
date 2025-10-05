@@ -5,38 +5,13 @@ import frappe
 import json
 from frappe.model.document import Document
 from italian_invoice.utilities.fatture import (
-    get_supplier_vat_from_json,
     get_invoice_number_from_json,
-    get_invoice_lines_from_json,
     get_invoice_total_from_json,
     get_fattura_body
 )
 
 
 class FatturaFornitoriSDI(Document):
-    @frappe.whitelist()
-    def get_supplier_vat(self):
-        """Estrae la P.IVA del fornitore dai dati fattura"""
-        if not self.dati_fattura:
-            frappe.throw("Dati fattura non disponibili")
-
-        return get_supplier_vat_from_json(json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura)
-
-    @frappe.whitelist()
-    def get_invoice_number(self):
-        """Estrae il numero fattura dai dati fattura"""
-        if not self.dati_fattura:
-            frappe.throw("Dati fattura non disponibili")
-
-        return get_invoice_number_from_json(json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura)
-
-    @frappe.whitelist()
-    def get_invoice_lines(self):
-        """Estrae le linee fattura dai dati fattura"""
-        if not self.dati_fattura:
-            frappe.throw("Dati fattura non disponibili")
-
-        return get_invoice_lines_from_json(json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura)
 
     def validate(self):
         # Validazioni di sicurezza per produzione

@@ -25,9 +25,14 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
         // Mostra pulsante Importa solo se non è già importata
         if (frm.doc.stato === "Da importare") {
             frm.add_custom_button(__("Importa Fattura"), () => {
-                // Ottieni supplier_vat dal Python
-                frm.call('get_supplier_vat').then(r => {
-                    const supplier_vat = r.message;
+                // Ottieni supplier_vat dalla utility function
+                frappe.call({
+                    method: 'italian_invoice.utilities.fatture.get_supplier_vat_from_json',
+                    args: {
+                        invoice_data: frm.doc.dati_fattura
+                    },
+                    callback: (r) => {
+                        const supplier_vat = r.message;
 
                     // Prima verifichiamo/creiamo il fornitore
                     frappe.call({
@@ -54,8 +59,7 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
                             show_items_dialog(frm, supplier_data);
                         }
                     });
-                }).catch(err => {
-                    frappe.throw(`Errore nell'estrazione della P.IVA fornitore: ${err.message}`);
+                    }
                 });
             });
 
@@ -69,9 +73,14 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
 
 
 function show_items_dialog(frm, supplier_data) {
-   // Get all invoice lines from Python
-   frm.call('get_invoice_lines').then(r => {
-       const allLines = r.message;
+   // Get all invoice lines from utility function
+   frappe.call({
+       method: 'italian_invoice.utilities.fatture.get_invoice_lines_from_json',
+       args: {
+           invoice_data: frm.doc.dati_fattura
+       },
+       callback: (r) => {
+           const allLines = r.message;
    const invoice_lines = allLines.filter(line => {
        // Include all lines with valid prezzo_totale or quantita (including negative values)
        return line.prezzo_totale != null || line.quantita != null;
@@ -336,16 +345,20 @@ function show_items_dialog(frm, supplier_data) {
    });
 
    d.show();
-   }).catch(err => {
-       frappe.throw(`Errore nell'estrazione delle linee fattura: ${err.message}`);
+       }
    });
 }
 
 
 function check_open_purchase_documents(frm) {
-    // Ottieni numero fattura dal Python
-    frm.call('get_invoice_number').then(r => {
-        const bill_no = r.message;
+    // Ottieni numero fattura dalla utility function
+    frappe.call({
+        method: 'italian_invoice.utilities.fatture.get_invoice_number_from_json',
+        args: {
+            invoice_data: frm.doc.dati_fattura
+        },
+        callback: (r) => {
+            const bill_no = r.message;
 
         frappe.call({
             method: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents_summary',
@@ -366,9 +379,7 @@ function check_open_purchase_documents(frm) {
                 }
             }
         });
-    }).catch(err => {
-        frappe.msgprint(`Errore nell'estrazione del numero fattura: ${err.message}`, 'Errore');
-        frm.get_field('documenti_aperti').$wrapper.html('');
+        }
     });
 }
 

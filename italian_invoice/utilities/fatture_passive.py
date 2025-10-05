@@ -241,10 +241,12 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
             item_mappings = json.loads(item_mappings)
 
         # Estrai dati fattura
-        payload = extract_invoice_payload(invoice_data)
+        from italian_invoice.utilities.fatture import get_invoice_payload, get_supplier_vat_from_json
+
+        payload = get_invoice_payload(invoice_data)
 
         # Ottieni o crea fornitore
-        supplier_vat = extract_supplier_vat(payload)
+        supplier_vat = get_supplier_vat_from_json(payload)
         supplier_result = get_or_create_supplier(supplier_vat, invoice_data)
 
         if not supplier_result["success"]:
@@ -316,18 +318,6 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
         frappe.db.rollback()
         frappe.log_error(f"Errore importazione: {str(e)}", "Italian Invoice Passive")
         frappe.throw(f"Errore importazione fattura: {str(e)}")
-
-
-def extract_invoice_payload(invoice_data):
-    """Estrae il payload dalla struttura dati"""
-    from italian_invoice.utilities.fatture import get_invoice_payload
-    return get_invoice_payload(invoice_data)
-
-
-def extract_supplier_vat(payload):
-    """Estrae partita IVA fornitore dal payload"""
-    from italian_invoice.utilities.fatture import get_supplier_vat_from_json
-    return get_supplier_vat_from_json(payload)
 
 
 def is_credit_note(tipo_documento):

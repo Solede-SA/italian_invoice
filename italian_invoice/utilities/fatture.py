@@ -87,16 +87,24 @@ def get_fattura_body(invoice_data):
     return result[0] if isinstance(result, list) and len(result) > 0 else result
 
 
+@frappe.whitelist()
 def get_supplier_vat_from_json(invoice_data):
     """Estrae la P.IVA del fornitore dal JSON"""
+    if isinstance(invoice_data, str):
+        invoice_data = json.loads(invoice_data)
+
     result = get_value_from_json_paths(invoice_data, JSON_PATHS["supplier_vat"])
     if not result:
         frappe.throw("Impossibile estrarre la P.IVA del fornitore dal JSON")
     return result
 
 
+@frappe.whitelist()
 def get_invoice_number_from_json(invoice_data):
     """Estrae il numero fattura dal JSON"""
+    if isinstance(invoice_data, str):
+        invoice_data = json.loads(invoice_data)
+
     body = get_fattura_body(invoice_data)
     if not body:
         frappe.throw("Impossibile estrarre il numero fattura dal JSON")
@@ -108,8 +116,12 @@ def get_invoice_number_from_json(invoice_data):
     return numero
 
 
+@frappe.whitelist()
 def get_invoice_lines_from_json(invoice_data):
     """Estrae le linee fattura dal JSON"""
+    if isinstance(invoice_data, str):
+        invoice_data = json.loads(invoice_data)
+
     body = get_fattura_body(invoice_data)
     if not body:
         frappe.throw("Impossibile estrarre le linee fattura dal JSON")
@@ -123,6 +135,9 @@ def get_invoice_lines_from_json(invoice_data):
 
 def get_invoice_total_from_json(invoice_data):
     """Estrae l'importo totale imponibile dal JSON"""
+    if isinstance(invoice_data, str):
+        invoice_data = json.loads(invoice_data)
+
     body = get_fattura_body(invoice_data)
     if not body:
         return None
