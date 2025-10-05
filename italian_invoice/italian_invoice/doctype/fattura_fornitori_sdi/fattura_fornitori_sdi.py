@@ -7,7 +7,7 @@ from frappe.model.document import Document
 from italian_invoice.utilities.fatture import (
     get_invoice_number_from_json,
     get_invoice_total_from_json,
-    get_fattura_body
+    get_document_type_from_json
 )
 
 
@@ -42,12 +42,11 @@ class FatturaFornitoriSDI(Document):
 
     def _get_tipo_documento(self):
         """Estrae il tipo documento dai dati fattura"""
-        dati = json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura
-        body = get_fattura_body(dati)
-        if not body:
+        try:
+            dati = json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura
+            return get_document_type_from_json(dati)
+        except:
             return None
-
-        return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento")
 
     def _get_numero_fattura(self):
         """Estrae il numero fattura dai dati fattura"""

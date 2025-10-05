@@ -153,6 +153,18 @@ def get_invoice_total_from_json(invoice_data):
         return None
 
 
+def get_document_type_from_json(invoice_data):
+    """Estrae il tipo documento (TD01, TD04, ecc.) dal JSON"""
+    if isinstance(invoice_data, str):
+        invoice_data = json.loads(invoice_data)
+
+    body = get_fattura_body(invoice_data)
+    if not body:
+        return None
+
+    return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento")
+
+
 def get_prefixed_company_tax_id(company_tax_id):
     return company_tax_id if company_tax_id.startswith("IT") else "IT" + company_tax_id
 
