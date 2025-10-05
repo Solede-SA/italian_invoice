@@ -4,29 +4,13 @@
 import frappe
 import json
 from frappe.model.document import Document
-from italian_invoice.utilities.fatture import get_value_from_json_paths
-
-
-def _get_fattura_body_from_json(dati_fattura):
-    """
-    Funzione DRY per estrarre il fattura_elettronica_body dal JSON
-
-    Args:
-        dati_fattura: JSON della fattura (str o dict)
-
-    Returns:
-        Il primo elemento del fattura_elettronica_body o None
-    """
-    paths = [
-        ["data", "data", "invoice", "payload", "fattura_elettronica_body"],
-        ["data", "invoice", "payload", "fattura_elettronica_body"],
-        ["invoice", "payload", "fattura_elettronica_body"],
-        ["invoice", "fattura_elettronica_body"],
-        ["fattura_elettronica_body"]
-    ]
-
-    body = get_value_from_json_paths(dati_fattura, paths)
-    return body[0] if body and len(body) > 0 else None
+from italian_invoice.utilities.fatture import (
+    get_supplier_vat_from_json,
+    get_invoice_number_from_json,
+    get_invoice_lines_from_json,
+    get_invoice_total_from_json,
+    get_fattura_body
+)
 
 
 class FatturaFornitoriSDI(Document):
@@ -36,39 +20,23 @@ class FatturaFornitoriSDI(Document):
         if not self.dati_fattura:
             frappe.throw("Dati fattura non disponibili")
 
-        paths = [
-            ["data", "data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"]
-        ]
-
-        result = get_value_from_json_paths(self.dati_fattura, paths)
-        if not result:
-            frappe.throw("Impossibile estrarre la P.IVA del fornitore dal JSON")
-
-        return result
+        return get_supplier_vat_from_json(json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura)
 
     @frappe.whitelist()
     def get_invoice_number(self):
         """Estrae il numero fattura dai dati fattura"""
-        numero = self._get_numero_fattura()
-        if not numero:
-            frappe.throw("Impossibile estrarre il numero fattura dal JSON")
-        return numero
+        if not self.dati_fattura:
+            frappe.throw("Dati fattura non disponibili")
+
+        return get_invoice_number_from_json(json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura)
 
     @frappe.whitelist()
     def get_invoice_lines(self):
         """Estrae le linee fattura dai dati fattura"""
-        body = _get_fattura_body_from_json(self.dati_fattura)
-        if not body:
-            frappe.throw("Impossibile estrarre le linee fattura dal JSON")
+        if not self.dati_fattura:
+            frappe.throw("Dati fattura non disponibili")
 
-        lines = body.get("dati_beni_servizi", {}).get("dettaglio_linee", [])
-        if not lines:
-            frappe.throw("Nessuna linea fattura trovata nel JSON")
-
-        return lines
+        return get_invoice_lines_from_json(json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura)
 
     def validate(self):
         # Validazioni di sicurezza per produzione
@@ -99,7 +67,8 @@ class FatturaFornitoriSDI(Document):
 
     def _get_tipo_documento(self):
         """Estrae il tipo documento dai dati fattura"""
-        body = _get_fattura_body_from_json(self.dati_fattura)
+        dati = json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura
+        body = get_fattura_body(dati)
         if not body:
             return None
 
@@ -107,25 +76,16 @@ class FatturaFornitoriSDI(Document):
 
     def _get_numero_fattura(self):
         """Estrae il numero fattura dai dati fattura"""
-        body = _get_fattura_body_from_json(self.dati_fattura)
-        if not body:
+        try:
+            dati = json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura
+            return get_invoice_number_from_json(dati)
+        except:
             return None
-
-        return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("numero")
 
     def _get_importo_totale(self):
         """Estrae l'importo totale imponibile dai dati fattura"""
-        body = _get_fattura_body_from_json(self.dati_fattura)
-        if not body:
-            return None
-
-        riepilogo = body.get("dati_beni_servizi", {}).get("dati_riepilogo", [])
-        if not riepilogo:
-            return None
-
-        # Somma tutti gli imponibili
         try:
-            totale = sum(float(riga.get("imponibile_importo", 0)) for riga in riepilogo)
-            return totale
+            dati = json.loads(self.dati_fattura) if isinstance(self.dati_fattura, str) else self.dati_fattura
+            return get_invoice_total_from_json(dati)
         except:
             return None

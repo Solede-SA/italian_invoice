@@ -13,6 +13,32 @@ from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from erpnext.regional.italy import state_codes
 
 
+# Costanti per percorsi JSON fatture elettroniche
+JSON_PATHS = {
+    "payload": [
+        ["data", "data", "invoice", "payload"],
+        ["data", "invoice", "payload"],
+        ["invoice", "payload"],
+        ["payload"]
+    ],
+    "fattura_body": [
+        ["data", "data", "invoice", "payload", "fattura_elettronica_body"],
+        ["data", "invoice", "payload", "fattura_elettronica_body"],
+        ["invoice", "payload", "fattura_elettronica_body"],
+        ["invoice", "fattura_elettronica_body"],
+        ["fattura_elettronica_body"]
+    ],
+    "supplier_vat": [
+        ["data", "data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ["data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ["invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ["payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ["fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ["cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"]
+    ]
+}
+
+
 def get_value_from_json_paths(dati_fattura, paths):
     """
     Funzione DRY generica per estrarre valori dal JSON provando diversi percorsi
@@ -41,6 +67,73 @@ def get_value_from_json_paths(dati_fattura, paths):
                 return obj
 
         return None
+    except:
+        return None
+
+
+def get_invoice_payload(invoice_data):
+    """Estrae il payload della fattura dal JSON"""
+    result = get_value_from_json_paths(invoice_data, JSON_PATHS["payload"])
+    if not result:
+        frappe.throw("Impossibile estrarre il payload dalla struttura JSON")
+    return result
+
+
+def get_fattura_body(invoice_data):
+    """Estrae il fattura_elettronica_body dal JSON"""
+    result = get_value_from_json_paths(invoice_data, JSON_PATHS["fattura_body"])
+    if not result:
+        frappe.throw("Impossibile estrarre il body dalla struttura JSON")
+    return result[0] if isinstance(result, list) and len(result) > 0 else result
+
+
+def get_supplier_vat_from_json(invoice_data):
+    """Estrae la P.IVA del fornitore dal JSON"""
+    result = get_value_from_json_paths(invoice_data, JSON_PATHS["supplier_vat"])
+    if not result:
+        frappe.throw("Impossibile estrarre la P.IVA del fornitore dal JSON")
+    return result
+
+
+def get_invoice_number_from_json(invoice_data):
+    """Estrae il numero fattura dal JSON"""
+    body = get_fattura_body(invoice_data)
+    if not body:
+        frappe.throw("Impossibile estrarre il numero fattura dal JSON")
+
+    numero = body.get("dati_generali", {}).get("dati_generali_documento", {}).get("numero")
+    if not numero:
+        frappe.throw("Numero fattura non trovato nel JSON")
+
+    return numero
+
+
+def get_invoice_lines_from_json(invoice_data):
+    """Estrae le linee fattura dal JSON"""
+    body = get_fattura_body(invoice_data)
+    if not body:
+        frappe.throw("Impossibile estrarre le linee fattura dal JSON")
+
+    lines = body.get("dati_beni_servizi", {}).get("dettaglio_linee", [])
+    if not lines:
+        frappe.throw("Nessuna linea fattura trovata nel JSON")
+
+    return lines
+
+
+def get_invoice_total_from_json(invoice_data):
+    """Estrae l'importo totale imponibile dal JSON"""
+    body = get_fattura_body(invoice_data)
+    if not body:
+        return None
+
+    riepilogo = body.get("dati_beni_servizi", {}).get("dati_riepilogo", [])
+    if not riepilogo:
+        return None
+
+    try:
+        totale = sum(float(riga.get("imponibile_importo", 0)) for riga in riepilogo)
+        return totale
     except:
         return None
 
