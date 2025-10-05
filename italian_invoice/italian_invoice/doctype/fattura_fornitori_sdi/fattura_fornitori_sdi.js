@@ -1,3 +1,10 @@
+function format_currency(value) {
+    return new Intl.NumberFormat('it-IT', {
+        style: 'currency',
+        currency: 'EUR'
+    }).format(value);
+}
+
 frappe.ui.form.on("Fattura Fornitori SDI", {
     refresh(frm) {
         // Check if we're in development mode
@@ -15,51 +22,56 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
         // Pulisci campo documenti aperti
         frm.get_field('documenti_aperti').$wrapper.html('');
 
-        // Verifica PO/PR aperti prima di mostrare il pulsante Importa
-        if (frm.doc.stato === "Da importare" && frm.doc.partita_iva_fornitore) {
-            check_open_purchase_documents(frm);
-        }
-
         // Mostra pulsante Importa solo se non è già importata
         if (frm.doc.stato === "Da importare") {
             frm.add_custom_button(__("Importa Fattura"), () => {
-                const json_data = JSON.parse(frm.doc.dati_fattura);
-                const supplier_vat = json_data.data.invoice.payload.fattura_elettronica_header.cedente_prestatore.dati_anagrafici.id_fiscale_iva.id_codice;
+                // Ottieni supplier_vat dal Python
+                frm.call('get_supplier_vat').then(r => {
+                    const supplier_vat = r.message;
 
-                // Prima verifichiamo/creiamo il fornitore
-                frappe.call({
-                    method: "openapi.api.eInvoice.purchase_invoice.get_or_create_supplier",
-                    args: {
-                        supplier_vat_id: supplier_vat,
-                        fattura_fornitori_sdi: frm.doc.name
-                    },
-                    callback: (r) => {
-                        if (!r.message.success) {
-                            frappe.throw(r.message.error);
-                            return;
+                    // Prima verifichiamo/creiamo il fornitore
+                    frappe.call({
+                        method: "openapi.api.eInvoice.purchase_invoice.get_or_create_supplier",
+                        args: {
+                            supplier_vat_id: supplier_vat,
+                            fattura_fornitori_sdi: frm.doc.name
+                        },
+                        callback: (r) => {
+                            if (!r.message.success) {
+                                frappe.throw(r.message.error);
+                                return;
+                            }
+
+                            const supplier_data = r.message.supplier_data;
+                            if (r.message.is_new) {
+                                frappe.show_alert({
+                                    message: __(`Nuovo fornitore ${supplier_data.supplier_name} creato`),
+                                    indicator: 'green'
+                                });
+                            }
+
+                            // Ora possiamo procedere con il dialog per i prodotti
+                            show_items_dialog(frm, supplier_data);
                         }
-
-                        const supplier_data = r.message.supplier_data;
-                        if (r.message.is_new) {
-                            frappe.show_alert({
-                                message: __(`Nuovo fornitore ${supplier_data.supplier_name} creato`),
-                                indicator: 'green'
-                            });
-                        }
-
-                        // Ora possiamo procedere con il dialog per i prodotti...
-                        show_items_dialog(frm, json_data, supplier_data);
-                    }
+                    });
+                }).catch(err => {
+                    frappe.throw(`Errore nell'estrazione della P.IVA fornitore: ${err.message}`);
                 });
             });
+
+            // Verifica PO/PR aperti (non bloccante)
+            if (frm.doc.partita_iva_fornitore) {
+                check_open_purchase_documents(frm);
+            }
         }
     }
 });
 
 
-function show_items_dialog(frm, json_data, supplier_data) {
-   // Get all invoice lines including negative values (discounts)
-   const allLines = json_data.data.invoice.payload.fattura_elettronica_body[0].dati_beni_servizi.dettaglio_linee;
+function show_items_dialog(frm, supplier_data) {
+   // Get all invoice lines from Python
+   frm.call('get_invoice_lines').then(r => {
+       const allLines = r.message;
    const invoice_lines = allLines.filter(line => {
        // Include all lines with valid prezzo_totale or quantita (including negative values)
        return line.prezzo_totale != null || line.quantita != null;
@@ -101,7 +113,7 @@ function show_items_dialog(frm, json_data, supplier_data) {
            fieldtype: 'Section Break'
        });
 
-       const importo_formatted = frappe.format(line.prezzo_totale, {fieldtype: 'Currency'});
+       const importo_formatted = format_currency(line.prezzo_totale);
        const html_desc = `
            <div style="margin-bottom: 5px;">
                <strong>Prodotto presente in Fattura</strong>
@@ -324,32 +336,39 @@ function show_items_dialog(frm, json_data, supplier_data) {
    });
 
    d.show();
+   }).catch(err => {
+       frappe.throw(`Errore nell'estrazione delle linee fattura: ${err.message}`);
+   });
 }
 
 
 function check_open_purchase_documents(frm) {
-    // Ottieni numero fattura per bill_no
-    const json_data = JSON.parse(frm.doc.dati_fattura);
-    const bill_no = json_data.data.invoice.payload.fattura_elettronica_body[0].dati_generali.dati_generali_documento.numero;
+    // Ottieni numero fattura dal Python
+    frm.call('get_invoice_number').then(r => {
+        const bill_no = r.message;
 
-    frappe.call({
-        method: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents_summary',
-        args: {
-            supplier_vat: frm.doc.partita_iva_fornitore
-        },
-        callback: (r) => {
-            if (r.message) {
-                const pos = r.message.purchase_orders || [];
-                const prs = r.message.purchase_receipts || [];
-                const total = pos.length + prs.length;
+        frappe.call({
+            method: 'italian_invoice.utilities.fatture_passive.get_open_purchase_documents_summary',
+            args: {
+                supplier_vat: frm.doc.partita_iva_fornitore
+            },
+            callback: (r) => {
+                if (r.message) {
+                    const pos = r.message.purchase_orders || [];
+                    const prs = r.message.purchase_receipts || [];
+                    const total = pos.length + prs.length;
 
-                if (total > 0) {
-                    show_po_pr_in_form(frm, pos, prs, bill_no);
-                } else {
-                    frm.get_field('documenti_aperti').$wrapper.html('');
+                    if (total > 0) {
+                        show_po_pr_in_form(frm, pos, prs, bill_no);
+                    } else {
+                        frm.get_field('documenti_aperti').$wrapper.html('');
+                    }
                 }
             }
-        }
+        });
+    }).catch(err => {
+        frappe.msgprint(`Errore nell'estrazione del numero fattura: ${err.message}`, 'Errore');
+        frm.get_field('documenti_aperti').$wrapper.html('');
     });
 }
 
@@ -382,7 +401,7 @@ function show_po_pr_in_form(frm, purchase_orders, purchase_receipts, bill_no) {
             html += `
                 <tr>
                     <td>${po.name}</td>
-                    <td style="text-align: right;">${frappe.format(po.grand_total, {fieldtype: 'Currency'})}</td>
+                    <td style="text-align: right;">${format_currency(po.grand_total)}</td>
                     <td style="text-align: center;">
                         <button class="btn btn-primary btn-sm" onclick="window.create_from_doc_${frm.doc.name.replace(/[^a-zA-Z0-9]/g, '_')}('${po.name}', 'Purchase Order', '${bill_no}')">Crea Fattura</button>
                     </td>
@@ -414,7 +433,7 @@ function show_po_pr_in_form(frm, purchase_orders, purchase_receipts, bill_no) {
             html += `
                 <tr>
                     <td>${pr.name}</td>
-                    <td style="text-align: right;">${frappe.format(pr.grand_total, {fieldtype: 'Currency'})}</td>
+                    <td style="text-align: right;">${format_currency(pr.grand_total)}</td>
                     <td style="text-align: center;">
                         <button class="btn btn-primary btn-sm" onclick="window.create_from_doc_${frm.doc.name.replace(/[^a-zA-Z0-9]/g, '_')}('${pr.name}', 'Purchase Receipt', '${bill_no}')">Crea Fattura</button>
                     </td>

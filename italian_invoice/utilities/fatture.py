@@ -13,6 +13,38 @@ from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from erpnext.regional.italy import state_codes
 
 
+def get_value_from_json_paths(dati_fattura, paths):
+    """
+    Funzione DRY generica per estrarre valori dal JSON provando diversi percorsi
+
+    Args:
+        dati_fattura: JSON della fattura (str o dict)
+        paths: Lista di percorsi da provare (lista di liste)
+
+    Returns:
+        Il primo valore trovato o None
+    """
+    if not dati_fattura:
+        return None
+
+    try:
+        dati = json.loads(dati_fattura) if isinstance(dati_fattura, str) else dati_fattura
+
+        for path in paths:
+            obj = dati
+            for key in path:
+                obj = obj.get(key, {})
+                if not obj:
+                    break
+
+            if obj:
+                return obj
+
+        return None
+    except:
+        return None
+
+
 def get_prefixed_company_tax_id(company_tax_id):
     return company_tax_id if company_tax_id.startswith("IT") else "IT" + company_tax_id
 

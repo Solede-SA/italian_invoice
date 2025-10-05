@@ -320,24 +320,37 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
 
 def extract_invoice_payload(invoice_data):
     """Estrae il payload dalla struttura dati"""
-    if "data" in invoice_data and "invoice" in invoice_data["data"]:
-        return invoice_data["data"]["invoice"]["payload"]
-    elif "payload" in invoice_data:
-        return invoice_data["payload"]
-    elif "fattura_elettronica_body" in invoice_data:
-        return invoice_data
-    else:
-        return invoice_data
+    from italian_invoice.utilities.fatture import get_value_from_json_paths
+
+    paths = [
+        ["data", "data", "invoice", "payload"],
+        ["data", "invoice", "payload"],
+        ["invoice", "payload"],
+        ["payload"],
+        ["fattura_elettronica_body"]
+    ]
+
+    result = get_value_from_json_paths(invoice_data, paths)
+    if not result:
+        frappe.throw("Impossibile estrarre il payload dalla struttura JSON")
+
+    return result
 
 
 def extract_supplier_vat(payload):
     """Estrae partita IVA fornitore dal payload"""
-    if "fattura_elettronica_header" in payload:
-        return payload["fattura_elettronica_header"]["cedente_prestatore"]["dati_anagrafici"]["id_fiscale_iva"]["id_codice"]
-    elif "cedente_prestatore" in payload:
-        return payload["cedente_prestatore"]["dati_anagrafici"]["id_fiscale_iva"]["id_codice"]
-    else:
+    from italian_invoice.utilities.fatture import get_value_from_json_paths
+
+    paths = [
+        ["fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+        ["cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"]
+    ]
+
+    result = get_value_from_json_paths(payload, paths)
+    if not result:
         frappe.throw("Impossibile trovare partita IVA fornitore")
+
+    return result
 
 
 def is_credit_note(tipo_documento):

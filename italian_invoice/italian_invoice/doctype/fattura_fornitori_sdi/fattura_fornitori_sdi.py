@@ -4,6 +4,7 @@
 import frappe
 import json
 from frappe.model.document import Document
+from italian_invoice.utilities.fatture import get_value_from_json_paths
 
 
 def _get_fattura_body_from_json(dati_fattura):
@@ -16,36 +17,59 @@ def _get_fattura_body_from_json(dati_fattura):
     Returns:
         Il primo elemento del fattura_elettronica_body o None
     """
-    if not dati_fattura:
-        return None
+    paths = [
+        ["data", "data", "invoice", "payload", "fattura_elettronica_body"],
+        ["data", "invoice", "payload", "fattura_elettronica_body"],
+        ["invoice", "payload", "fattura_elettronica_body"],
+        ["invoice", "fattura_elettronica_body"],
+        ["fattura_elettronica_body"]
+    ]
 
-    try:
-        dati = json.loads(dati_fattura) if isinstance(dati_fattura, str) else dati_fattura
-
-        # Percorsi possibili per trovare il body
-        paths = [
-            ["data", "invoice", "payload", "fattura_elettronica_body"],
-            ["invoice", "payload", "fattura_elettronica_body"],
-            ["invoice", "fattura_elettronica_body"],
-            ["fattura_elettronica_body"]
-        ]
-
-        for path in paths:
-            obj = dati
-            for key in path:
-                obj = obj.get(key, {})
-                if not obj:
-                    break
-
-            if obj and len(obj) > 0:
-                return obj[0]
-
-        return None
-    except:
-        return None
+    body = get_value_from_json_paths(dati_fattura, paths)
+    return body[0] if body and len(body) > 0 else None
 
 
 class FatturaFornitoriSDI(Document):
+    @frappe.whitelist()
+    def get_supplier_vat(self):
+        """Estrae la P.IVA del fornitore dai dati fattura"""
+        if not self.dati_fattura:
+            frappe.throw("Dati fattura non disponibili")
+
+        paths = [
+            ["data", "data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            ["payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"]
+        ]
+
+        result = get_value_from_json_paths(self.dati_fattura, paths)
+        if not result:
+            frappe.throw("Impossibile estrarre la P.IVA del fornitore dal JSON")
+
+        return result
+
+    @frappe.whitelist()
+    def get_invoice_number(self):
+        """Estrae il numero fattura dai dati fattura"""
+        numero = self._get_numero_fattura()
+        if not numero:
+            frappe.throw("Impossibile estrarre il numero fattura dal JSON")
+        return numero
+
+    @frappe.whitelist()
+    def get_invoice_lines(self):
+        """Estrae le linee fattura dai dati fattura"""
+        body = _get_fattura_body_from_json(self.dati_fattura)
+        if not body:
+            frappe.throw("Impossibile estrarre le linee fattura dal JSON")
+
+        lines = body.get("dati_beni_servizi", {}).get("dettaglio_linee", [])
+        if not lines:
+            frappe.throw("Nessuna linea fattura trovata nel JSON")
+
+        return lines
+
     def validate(self):
         # Validazioni di sicurezza per produzione
         if not frappe.conf.get('developer_mode'):
