@@ -311,4 +311,16 @@ fixtures = [
             ],
         ],
     },
+    {
+        "dt": "Report",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Registro IVA",
+                ],
+            ],
+        ],
+    },
 ]
