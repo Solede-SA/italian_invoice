@@ -57,25 +57,10 @@ def get_or_create_supplier(supplier_vat_id, invoice_data):
 def extract_supplier_data(invoice_data):
     """
     Estrae dati fornitore dal formato JSON/XML della fattura
-    Supporta diversi formati di input
+    Usa la funzione centralizzata per gestire diversi formati
     """
-    # Se è una stringa JSON, parsala
-    if isinstance(invoice_data, str):
-        invoice_data = json.loads(invoice_data)
-
-    # Cerca il cedente_prestatore nei vari formati possibili
-    if "data" in invoice_data and "invoice" in invoice_data["data"]:
-        # Formato OpenAPI
-        payload = invoice_data["data"]["invoice"]["payload"]
-        return payload["fattura_elettronica_header"]["cedente_prestatore"]
-    elif "fattura_elettronica_header" in invoice_data:
-        # Formato diretto
-        return invoice_data["fattura_elettronica_header"]["cedente_prestatore"]
-    elif "cedente_prestatore" in invoice_data:
-        # Formato semplificato
-        return invoice_data["cedente_prestatore"]
-    else:
-        frappe.throw("Formato fattura non riconosciuto")
+    from italian_invoice.utilities.fatture import get_cedente_prestatore_from_json
+    return get_cedente_prestatore_from_json(invoice_data)
 
 
 def create_supplier(supplier_data, company):
@@ -803,8 +788,12 @@ def get_default_supplier_group():
     if default:
         return default
 
-    # Altrimenti usa "All Supplier Groups" che esiste sempre
-    return "All Supplier Groups"
+    # Cerca il primo gruppo disponibile (gestisce multilingua)
+    groups = frappe.get_all("Supplier Group", fields=["name"], limit=1)
+    if groups:
+        return groups[0]["name"]
+
+    frappe.throw("Nessun Supplier Group trovato nel sistema")
 
 
 def get_default_uom():

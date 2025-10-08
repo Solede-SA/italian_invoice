@@ -35,6 +35,14 @@ JSON_PATHS = {
         ["payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
         ["fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
         ["cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"]
+    ],
+    "cedente_prestatore": [
+        ["data", "data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore"],
+        ["data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore"],
+        ["invoice", "payload", "fattura_elettronica_header", "cedente_prestatore"],
+        ["payload", "fattura_elettronica_header", "cedente_prestatore"],
+        ["fattura_elettronica_header", "cedente_prestatore"],
+        ["cedente_prestatore"]
     ]
 }
 
@@ -96,6 +104,18 @@ def get_supplier_vat_from_json(invoice_data):
     result = get_value_from_json_paths(invoice_data, JSON_PATHS["supplier_vat"])
     if not result:
         frappe.throw("Impossibile estrarre la P.IVA del fornitore dal JSON")
+    return result
+
+
+@frappe.whitelist()
+def get_cedente_prestatore_from_json(invoice_data):
+    """Estrae i dati completi del cedente prestatore dal JSON"""
+    if isinstance(invoice_data, str):
+        invoice_data = json.loads(invoice_data)
+
+    result = get_value_from_json_paths(invoice_data, JSON_PATHS["cedente_prestatore"])
+    if not result:
+        frappe.throw("Impossibile estrarre il cedente prestatore dal JSON")
     return result
 
 
