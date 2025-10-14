@@ -418,9 +418,9 @@ def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sd
 
 def _get_bill_date_from_fattura_sdi(fattura_sdi):
     """Estrae la data fattura dai dati JSON della Fattura Fornitori SDI"""
-    from italian_invoice.italian_invoice.doctype.fattura_fornitori_sdi.fattura_fornitori_sdi import _get_fattura_body_from_json
+    from italian_invoice.utilities.fatture import get_fattura_body_from_json
 
-    body = _get_fattura_body_from_json(fattura_sdi.dati_fattura)
+    body = get_fattura_body_from_json(fattura_sdi.dati_fattura)
     if not body:
         return None
 
