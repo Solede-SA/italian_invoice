@@ -241,7 +241,8 @@ doc_events = {
         "validate": "italian_invoice.crud_events.sales_invoice.validate.execute",
     },
     "Payment Entry": {
-        "before_save": "italian_invoice.crud_events.payment_entry.handle_rounding",
+        "validate": "italian_invoice.crud_events.payment_entry.handle_rounding",
+        "before_submit": "italian_invoice.crud_events.payment_entry.validate_rounding_on_submit",
         "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
     },
     "Purchase Invoice": {
