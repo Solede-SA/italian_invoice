@@ -42,11 +42,14 @@ Italian Invoice trasforma ERPNext in una soluzione completa per la fatturazione 
 - Matching fornitore basato su P.IVA con fallback su nome
 
 **Per Gestione Pagamenti**:
+- Allocazione automatica intelligente per pagamenti parziali entro soglia
+- Sistema dual-stage: aggiustamento allocated_amount + gestione difference_amount
 - Arrotondamento automatico differenze entro soglia configurabile
 - Gestione `unallocated_amount` e `difference_amount` trasparente
 - Creazione automatica righe deduction con account configurato
 - Payment Rounding Log per audit e compliance
 - Messaggi chiari informativi e warning durante workflow
+- Esempio: pagamento 200,490€ per fattura 200,495€ → alloca 200,495€ con arrotondamento 0,005€
 
 **Per Compliance e Audit**:
 - Audit trail completo di tutte le transazioni SDI
@@ -80,12 +83,14 @@ Italian Invoice trasforma ERPNext in una soluzione completa per la fatturazione 
 - ✅ **Reversibilità** delle operazioni di aggiustamento
 
 ### Arrotondamento Pagamenti
-- ✅ **Arrotondamento automatico** per piccole differenze entro soglia configurabile
+- ✅ **Allocazione automatica intelligente** per differenze in difetto entro soglia
+- ✅ **Arrotondamento automatico** per eccesso/difetto su difference_amount e unallocated_amount
 - ✅ **Gestione deduzioni** con creazione automatica righe di arrotondamento
 - ✅ **Validazione submit** blocca se differenza supera soglia
 - ✅ **Audit trail** completo con Payment Rounding Log
 - ✅ **Configurazione per Company** con payment_rounding_threshold personalizzabile
 - ✅ **Messaggi chiari** informativi durante salvataggio e warning se soglia superata
+- ✅ **Gestione pagamenti parziali** alloca automaticamente l'intero importo fattura se differenza minima
 
 ### Supporto Lettera d'Intento
 - ✅ **Rilevamento automatico** clienti con lettera d'intento attiva
@@ -648,7 +653,10 @@ doc_events = {
         "on_cancel": "italian_invoice.crud_events.sales_invoice.on_cancel.execute",
     },
     "Payment Entry": {
-        "validate": "italian_invoice.crud_events.payment_entry.handle_rounding",
+        "validate": [
+            "italian_invoice.crud_events.payment_entry.adjust_allocated_amount_for_rounding",
+            "italian_invoice.crud_events.payment_entry.handle_rounding",
+        ],
         "before_submit": "italian_invoice.crud_events.payment_entry.validate_rounding_on_submit",
         "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
     },
@@ -823,16 +831,87 @@ Riceve notifiche SDI dal provider OpenAPI.
 
 ### Payment Entry Rounding (Auto-eseguito via Hooks)
 
-Le funzioni di arrotondamento NON sono whitelist ma eseguite automaticamente via document hooks:
+Il sistema di arrotondamento pagamenti utilizza un approccio **dual-stage** per massimizzare automazione e precisione:
 
-- `handle_rounding(doc, method)`: Eseguito durante `validate`
-- `validate_rounding_on_submit(doc, method)`: Eseguito durante `before_submit`
-- `after_insert(doc, method)`: Crea Payment Rounding Log
+#### Stage 1: Allocazione Automatica Intelligente
+**Funzione**: `adjust_allocated_amount_for_rounding(doc, method)`
+**Esecuzione**: Durante `validate` (prima di handle_rounding)
+
+Gestisce pagamenti parziali dove l'importo pagato è leggermente inferiore all'outstanding della fattura:
+
+**Comportamento**:
+1. Itera su tutte le righe in `references` (child table fatture)
+2. Per ogni fattura calcola: `remaining = outstanding_amount - allocated_amount`
+3. Se `remaining > 0` (pagato di meno) e `remaining <= threshold`:
+   - Imposta `allocated_amount = outstanding_amount` (alloca intero importo fattura)
+   - Forza ricalcolo: `set_total_allocated_amount()`, `set_unallocated_amount()`, `set_difference_amount()`
+   - Mostra messaggio informativo con dettagli
+
+**Esempio pratico**:
+```
+Input:
+- paid_amount: 200,490€
+- Fattura outstanding_amount: 200,495€
+- Sistema alloca inizialmente: 200,490€ (parziale)
+
+Dopo adjust_allocated_amount_for_rounding:
+- allocated_amount → 200,495€ (intero importo fattura)
+- Genera difference_amount: 0,005€ (200,490 pagato - 200,495 allocato)
+```
+
+#### Stage 2: Gestione Arrotondamento
+**Funzione**: `handle_rounding(doc, method)`
+**Esecuzione**: Durante `validate` (dopo adjust_allocated_amount)
+
+Gestisce `difference_amount` e `unallocated_amount` residui dallo Stage 1:
+
+**Comportamento**:
+1. Verifica se esiste `unallocated_amount` (pagato di più) o `difference_amount`
+2. Se entro soglia:
+   - Aggiunge riga in `deductions` con account arrotondamenti
+   - Segno corretto: `-1` per unallocated, `+1` per difference
+   - Forza ricalcolo importi
+3. Se supera soglia: mostra warning (non blocca in validate)
+
+**Esempio (continua da Stage 1)**:
+```
+Input da Stage 1:
+- difference_amount: 0,005€
+
+Dopo handle_rounding:
+- Riga deduction aggiunta: +0,005€
+- difference_amount → 0€
+- Fattura completamente pagata ✅
+```
+
+#### Stage 3: Validazione Submit
+**Funzione**: `validate_rounding_on_submit(doc, method)`
+**Esecuzione**: Durante `before_submit`
+
+**Comportamento**:
+- Riapplica arrotondamento se deductions rimosse
+- **BLOCCA submit** se `difference_amount > threshold`
+- Crea Payment Rounding Log per audit trail
+
+#### Stage 4: Log Creazione
+**Funzione**: `after_insert(doc, method)`
+**Esecuzione**: Dopo inserimento documento
+
+Crea record in Payment Rounding Log con:
+- Payment Entry collegato
+- Fattura di riferimento
+- Importi originale, arrotondato, differenza
 
 **Configurazione Company richiesta**:
 - `payment_rounding_threshold`: Soglia (default 0.50 EUR)
 - `round_off_account`: Account contabile arrotondamenti
 - `cost_center`: Centro di costo default
+
+**Casi d'uso coperti**:
+1. ✅ Pagamento 200,490€ per fattura 200,495€ → Alloca 200,495€, arrotonda 0,005€
+2. ✅ Pagamento 100,50€ per fattura 100,00€ → Unallocated 0,50€ gestito
+3. ✅ Pagamento multi-fattura con piccole differenze → Ogni fattura gestita indipendentemente
+4. ❌ Differenza > soglia → Blocco submit con messaggio chiaro
 
 ## ⚙️ Best Practices e Configurazione
 
