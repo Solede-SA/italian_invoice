@@ -15,6 +15,7 @@ Italian Invoice trasforma ERPNext in una soluzione completa per la fatturazione 
 
 - ✅ **~4,700 linee di codice Python** produzione-ready
 - ✅ **8 Custom DocTypes** per gestione completa workflow
+- ✅ **2 Report Script Report** per registri IVA vendite e acquisti
 - ✅ **80+ Custom Fields** integrati seamlessly con ERPNext
 - ✅ **Validazione XML multi-livello** con messaggi user-friendly
 - ✅ **Architettura provider pluggabile** per diversi servizi SDI
@@ -22,6 +23,7 @@ Italian Invoice trasforma ERPNext in una soluzione completa per la fatturazione 
 - ✅ **Arrotondamento pagamenti automatico** con audit trail completo
 - ✅ **Supporto lettera d'intento** con esenzione IVA automatica
 - ✅ **Delivery Note billing gap management** per DDT
+- ✅ **Registri IVA conformi** alla normativa italiana con export multi-formato
 - ✅ **Zero dipendenze esterne** (provider Manual built-in)
 
 ### 🎯 Cosa Risolve
@@ -59,6 +61,16 @@ Italian Invoice trasforma ERPNext in una soluzione completa per la fatturazione 
 - Supporto esenzioni IVA con codici normativi (N1-N7)
 
 ## 🚀 Funzionalità
+
+### Registri IVA
+- ✅ **Registro IVA Vendite** conforme normativa italiana
+- ✅ **Registro IVA Acquisti** con gestione reverse charge e IVA indetraibile
+- ✅ **Suddivisione automatica** per aliquote IVA (22%, 10%, 5%, 4%)
+- ✅ **Calcolo intelligente** imponibile da item_wise_tax_detail o tax_amount/rate
+- ✅ **Operazioni speciali** gestite automaticamente (esenti, non imponibili, reverse charge)
+- ✅ **Esportazione** in Excel, PDF, CSV per archiviazione e stampa
+- ✅ **Filtri flessibili** per periodo, azienda, cliente/fornitore
+- ✅ **Riga totali automatica** per riconciliazione immediata
 
 ### Fatturazione Attiva
 - ✅ **Generazione XML** fatture elettroniche conformi allo standard SDI
@@ -186,6 +198,50 @@ Quando effettui il submit di una Purchase Invoice:
 - In caso di cancellazione della PI, il link viene rimosso e lo stato torna a "Da importare"
 
 ## 📝 Utilizzo
+
+### Registri IVA
+
+#### Registro IVA Vendite
+1. Vai in **Reports > Registro IVA Vendite**
+2. Seleziona:
+   - **Company**: Azienda di riferimento (obbligatorio)
+   - **From Date / To Date**: Periodo da visualizzare (default: ultimo mese)
+   - **Customer**: Opzionale, per filtrare per cliente specifico
+3. Clicca **Refresh** per generare il report
+4. Il report mostra:
+   - Numerazione progressiva automatica
+   - Data e numero fattura
+   - Cliente con P.IVA/CF
+   - Imponibile e imposta suddivisi per aliquota (22%, 10%, 5%, 4%)
+   - Operazioni esenti e non imponibili
+   - Totale fattura
+   - Note per operazioni speciali
+5. **Esporta** in Excel, PDF o CSV usando i pulsanti del report
+
+#### Registro IVA Acquisti
+1. Vai in **Reports > Registro IVA Acquisti**
+2. Seleziona:
+   - **Company**: Azienda di riferimento (obbligatorio)
+   - **From Date / To Date**: Periodo da visualizzare (default: ultimo mese)
+   - **Supplier**: Opzionale, per filtrare per fornitore specifico
+3. Clicca **Refresh** per generare il report
+4. Il report mostra:
+   - Numerazione progressiva automatica
+   - Data e numero documento fornitore
+   - Fornitore con P.IVA/CF
+   - Imponibile e imposta suddivisi per aliquota
+   - IVA non detraibile (gestita separatamente)
+   - Operazioni esenti e non imponibili
+   - Rilevamento automatico reverse charge
+   - Totale fattura
+   - Note per operazioni speciali
+5. **Esporta** in Excel, PDF o CSV usando i pulsanti del report
+
+**Note tecniche**:
+- Il calcolo dell'imponibile avviene in due modi:
+  1. Se disponibile `item_wise_tax_detail`, somma degli imponibili per item
+  2. Altrimenti calcolo inverso: `imponibile = imposta / (aliquota / 100)`
+- La riga totale finale mostra la somma di tutti i valori per verifica
 
 ### Generazione Fattura Elettronica (Attiva)
 
