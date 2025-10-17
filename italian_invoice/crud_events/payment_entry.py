@@ -3,6 +3,51 @@ from frappe import _
 from frappe.utils import flt
 
 
+def adjust_allocated_amount_for_rounding(doc, method):
+	"""
+	Aggiusta l'allocated_amount nelle references se la differenza tra paid_amount
+	e outstanding_amount è entro la soglia di arrotondamento.
+	Questo permette di allocare l'intero importo della fattura anche se pagato leggermente meno.
+	"""
+	if not doc.references or doc.docstatus == 1:
+		return
+
+	# Ottieni la soglia dalla Company
+	threshold = flt(frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50)
+
+	adjusted = False
+
+	for ref in doc.references:
+		outstanding = flt(ref.outstanding_amount)
+		allocated = flt(ref.allocated_amount)
+
+		# Calcola quanto manca da allocare su questa specifica fattura
+		remaining = outstanding - allocated
+
+		# Se c'è un importo non allocato positivo (pagato di meno) ed è entro la soglia
+		if remaining > 0 and remaining <= threshold:
+			# Alloca l'intero importo outstanding
+			ref.allocated_amount = outstanding
+			adjusted = True
+
+			frappe.msgprint(
+				_("Arrotondamento automatico applicato su fattura {0}: allocati {1} invece di {2} (differenza: {3})").format(
+					ref.reference_name,
+					frappe.format_value(outstanding, {"fieldtype": "Currency"}),
+					frappe.format_value(allocated, {"fieldtype": "Currency"}),
+					frappe.format_value(remaining, {"fieldtype": "Currency"})
+				),
+				title=_("Allocazione con Arrotondamento"),
+				indicator="blue"
+			)
+
+	# Forza il ricalcolo di total_allocated_amount, unallocated_amount e difference_amount
+	if adjusted:
+		doc.set_total_allocated_amount()
+		doc.set_unallocated_amount()
+		doc.set_difference_amount()
+
+
 def handle_rounding(doc, method):
     """
     Gestisce l'arrotondamento automatico durante il validate.
