@@ -10,7 +10,7 @@ def execute(filters=None):
 
 
 def get_columns():
-	"""Definisce le colonne del registro IVA vendite"""
+	"""Definisce le colonne del registro IVA acquisti"""
 	return [
 		{
 			"fieldname": "progressive",
@@ -25,15 +25,21 @@ def get_columns():
 			"width": 100
 		},
 		{
+			"fieldname": "bill_no",
+			"label": _("N. Documento"),
+			"fieldtype": "Data",
+			"width": 120
+		},
+		{
 			"fieldname": "name",
-			"label": _("N. Fattura"),
+			"label": _("Fattura Acquisto"),
 			"fieldtype": "Link",
-			"options": "Sales Invoice",
+			"options": "Purchase Invoice",
 			"width": 150
 		},
 		{
-			"fieldname": "customer_name",
-			"label": _("Cliente"),
+			"fieldname": "supplier_name",
+			"label": _("Fornitore"),
 			"fieldtype": "Data",
 			"width": 200
 		},
@@ -104,6 +110,12 @@ def get_columns():
 			"width": 120
 		},
 		{
+			"fieldname": "indetraibile",
+			"label": _("Non Detraibile"),
+			"fieldtype": "Currency",
+			"width": 120
+		},
+		{
 			"fieldname": "totale",
 			"label": _("Totale"),
 			"fieldtype": "Currency",
@@ -119,22 +131,24 @@ def get_columns():
 
 
 def get_data(filters):
-	"""Recupera i dati delle fatture di vendita e li raggruppa per aliquota IVA"""
+	"""Recupera i dati delle fatture di acquisto e li raggruppa per aliquota IVA"""
 	conditions = get_conditions(filters)
 
 	invoices = frappe.db.sql(f"""
 		SELECT
-			si.name,
-			si.posting_date,
-			si.customer,
-			si.customer_name,
-			si.tax_id,
-			si.grand_total,
-			si.status
-		FROM `tabSales Invoice` si
-		WHERE si.docstatus = 1
+			pi.name,
+			pi.posting_date,
+			pi.bill_no,
+			pi.bill_date,
+			pi.supplier,
+			pi.supplier_name,
+			pi.tax_id,
+			pi.grand_total,
+			pi.status
+		FROM `tabPurchase Invoice` pi
+		WHERE pi.docstatus = 1
 		{conditions}
-		ORDER BY si.posting_date, si.name
+		ORDER BY pi.posting_date, pi.name
 	""", filters, as_dict=1)
 
 	if not invoices:
@@ -147,8 +161,9 @@ def get_data(filters):
 		row = {
 			"progressive": progressive,
 			"posting_date": invoice.posting_date,
+			"bill_no": invoice.bill_no or "",
 			"name": invoice.name,
-			"customer_name": invoice.customer_name,
+			"supplier_name": invoice.supplier_name,
 			"tax_id": invoice.tax_id or "",
 			"imponibile_22": 0,
 			"imposta_22": 0,
@@ -160,6 +175,7 @@ def get_data(filters):
 			"imposta_4": 0,
 			"esente": 0,
 			"non_imponibile": 0,
+			"indetraibile": 0,
 			"totale": invoice.grand_total,
 			"note": ""
 		}
@@ -172,6 +188,11 @@ def get_data(filters):
 			rate = flt(tax.get("rate"))
 			base_amount = flt(tax.get("base_amount"))
 			tax_amount = flt(tax.get("tax_amount"))
+
+			# Gestione IVA non detraibile
+			if tax.get("add_deduct_tax") == "Deduct":
+				row["indetraibile"] += tax_amount
+				continue
 
 			if rate == 22:
 				row["imponibile_22"] += base_amount
@@ -199,6 +220,12 @@ def get_data(filters):
 			notes.append("Esente")
 		if row["non_imponibile"] > 0:
 			notes.append("Non Imp.")
+		if row["indetraibile"] > 0:
+			notes.append("IVA Indetr.")
+
+		# Verifica se è reverse charge
+		if is_reverse_charge(invoice.name):
+			notes.append("Rev. Charge")
 
 		row["note"] = ", ".join(notes)
 
@@ -216,8 +243,10 @@ def get_tax_breakdown(invoice_name):
 			description,
 			rate,
 			base_tax_amount as tax_amount,
-			item_wise_tax_detail
-		FROM `tabSales Taxes and Charges`
+			item_wise_tax_detail,
+			add_deduct_tax,
+			charge_type
+		FROM `tabPurchase Taxes and Charges`
 		WHERE parent = %s
 		ORDER BY idx
 	""", invoice_name, as_dict=1)
@@ -249,10 +278,27 @@ def get_tax_breakdown(invoice_name):
 				"description": tax.description,
 				"rate": flt(tax.get("rate")),
 				"base_amount": base_amount,
-				"tax_amount": tax_amount
+				"tax_amount": tax_amount,
+				"add_deduct_tax": tax.add_deduct_tax
 			})
 
 	return result
+
+
+def is_reverse_charge(invoice_name):
+	"""Verifica se la fattura è in reverse charge"""
+	result = frappe.db.sql("""
+		SELECT COUNT(*) as count
+		FROM `tabPurchase Taxes and Charges`
+		WHERE parent = %s
+		AND (
+			description LIKE '%%reverse%%charge%%'
+			OR description LIKE '%%invers%%contab%%'
+			OR account_head LIKE '%%reverse%%charge%%'
+		)
+	""", invoice_name, as_dict=1)
+
+	return result[0].count > 0 if result else False
 
 
 def get_conditions(filters):
@@ -260,15 +306,15 @@ def get_conditions(filters):
 	conditions = []
 
 	if filters.get("company"):
-		conditions.append("si.company = %(company)s")
+		conditions.append("pi.company = %(company)s")
 
 	if filters.get("from_date"):
-		conditions.append("si.posting_date >= %(from_date)s")
+		conditions.append("pi.posting_date >= %(from_date)s")
 
 	if filters.get("to_date"):
-		conditions.append("si.posting_date <= %(to_date)s")
+		conditions.append("pi.posting_date <= %(to_date)s")
 
-	if filters.get("customer"):
-		conditions.append("si.customer = %(customer)s")
+	if filters.get("supplier"):
+		conditions.append("pi.supplier = %(supplier)s")
 
 	return " AND " + " AND ".join(conditions) if conditions else ""
