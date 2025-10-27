@@ -2,16 +2,14 @@ import frappe
 from frappe import _
 from frappe.utils import flt, now
 
+
 @frappe.whitelist()
 def calculate_billing_gap(delivery_note_name):
     """Calcola la differenza di fatturazione per un DDT"""
     dn = frappe.get_doc("Delivery Note", delivery_note_name)
 
     if dn.docstatus != 1:
-        return {
-            'billing_gap': 0,
-            'can_force_complete': False
-        }
+        return {"billing_gap": 0, "can_force_complete": False}
 
     # Calcola il totale da fatturare
     total_amount = sum(flt(item.amount) for item in dn.items)
@@ -29,12 +27,13 @@ def calculate_billing_gap(delivery_note_name):
     # Il valore verrà aggiornato dal client JavaScript
 
     return {
-        'total_amount': total_amount,
-        'total_billed': total_billed,
-        'billing_gap': billing_gap,
-        'per_billed': dn.per_billed,
-        'can_force_complete': can_force_complete
+        "total_amount": total_amount,
+        "total_billed": total_billed,
+        "billing_gap": billing_gap,
+        "per_billed": dn.per_billed,
+        "can_force_complete": can_force_complete,
     }
+
 
 @frappe.whitelist()
 def force_billing_complete(delivery_note_name, reason):
@@ -47,18 +46,24 @@ def force_billing_complete(delivery_note_name, reason):
     # Calcola il gap attuale
     gap_info = calculate_billing_gap(delivery_note_name)
 
-    if not gap_info['can_force_complete']:
-        frappe.throw(_("The billing difference is too large or negative. Cannot force completion."))
+    if not gap_info["can_force_complete"]:
+        frappe.throw(
+            _(
+                "The billing difference is too large or negative. Cannot force completion."
+            )
+        )
 
     # Crea il log per tracciabilità
-    log = frappe.get_doc({
-        "doctype": "Delivery Note Billing Adjustment Log",
-        "delivery_note": delivery_note_name,
-        "adjustment_amount": gap_info['billing_gap'],
-        "reason": reason,
-        "adjusted_by": frappe.session.user,
-        "adjustment_date": now()
-    })
+    log = frappe.get_doc(
+        {
+            "doctype": "Delivery Note Billing Adjustment Log",
+            "delivery_note": delivery_note_name,
+            "adjustment_amount": gap_info["billing_gap"],
+            "reason": reason,
+            "adjusted_by": frappe.session.user,
+            "adjustment_date": now(),
+        }
+    )
     log.insert()
 
     # Aggiorna il Delivery Note
@@ -77,17 +82,20 @@ def force_billing_complete(delivery_note_name, reason):
     # Aggiungi commento per tracciabilità
     dn.add_comment(
         "Comment",
-        f"Billing forced to complete. Gap amount: {gap_info['billing_gap']:.2f}. Reason: {reason}"
+        f"Billing forced to complete. Gap amount: {gap_info['billing_gap']:.2f}. Reason: {reason}",
     )
 
     frappe.db.commit()
 
     frappe.msgprint(
-        _("Delivery Note marked as fully billed. Difference: {0}").format(gap_info['billing_gap']),
-        alert=True
+        _("Delivery Note marked as fully billed. Difference: {0}").format(
+            gap_info["billing_gap"]
+        ),
+        alert=True,
     )
 
     return True
+
 
 @frappe.whitelist()
 def revert_billing_adjustment(delivery_note_name):
@@ -102,7 +110,7 @@ def revert_billing_adjustment(delivery_note_name):
         "Delivery Note Billing Adjustment Log",
         filters={"delivery_note": delivery_note_name},
         order_by="adjustment_date desc",
-        limit=1
+        limit=1,
     )
 
     if not adjustments:
@@ -136,7 +144,7 @@ def revert_billing_adjustment(delivery_note_name):
     # Aggiungi commento
     dn.add_comment(
         "Comment",
-        f"Billing adjustment reverted. Restored per_billed to {actual_per_billed:.2f}%"
+        f"Billing adjustment reverted. Restored per_billed to {actual_per_billed:.2f}%",
     )
 
     frappe.db.commit()
@@ -144,6 +152,7 @@ def revert_billing_adjustment(delivery_note_name):
     frappe.msgprint(_("Billing adjustment has been reverted"), alert=True)
 
     return True
+
 
 def update_billing_gap_on_save(doc, method):
     """Hook per aggiornare il billing gap quando viene salvato un Delivery Note"""

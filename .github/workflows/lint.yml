@@ -27,12 +27,12 @@ jobs:
       - name: Lint with ruff
         run: |
           # Check for errors
-          ruff check solede_openbanking/
+          ruff check italian_invoice/
 
       - name: Format check with ruff
         run: |
           # Check formatting
-          ruff format --check solede_openbanking/
+          ruff format --check italian_invoice/
 
   lint-javascript:
     runs-on: ubuntu-latest
@@ -53,9 +53,9 @@ jobs:
       - name: Lint JavaScript
         run: |
           # Lint JS files
-          eslint solede_openbanking/public/js/*.js || true
+          eslint italian_invoice/public/js/*.js || true
 
       - name: Check formatting
         run: |
           # Check prettier formatting
-          prettier --check "solede_openbanking/public/js/*.js" || true
+          prettier --check "italian_invoice/public/js/*.js" || true

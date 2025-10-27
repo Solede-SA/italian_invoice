@@ -6,4 +6,4 @@ from frappe.model.document import Document
 
 
 class NotificheSDI(Document):
-	pass
+    pass

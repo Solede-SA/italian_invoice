@@ -4,48 +4,52 @@ from frappe.utils import flt
 
 
 def adjust_allocated_amount_for_rounding(doc, method):
-	"""
-	Aggiusta l'allocated_amount nelle references se la differenza tra paid_amount
-	e outstanding_amount è entro la soglia di arrotondamento.
-	Questo permette di allocare l'intero importo della fattura anche se pagato leggermente meno.
-	"""
-	if not doc.references or doc.docstatus == 1:
-		return
+    """
+    Aggiusta l'allocated_amount nelle references se la differenza tra paid_amount
+    e outstanding_amount è entro la soglia di arrotondamento.
+    Questo permette di allocare l'intero importo della fattura anche se pagato leggermente meno.
+    """
+    if not doc.references or doc.docstatus == 1:
+        return
 
-	# Ottieni la soglia dalla Company
-	threshold = flt(frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50)
+    # Ottieni la soglia dalla Company
+    threshold = flt(
+        frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50
+    )
 
-	adjusted = False
+    adjusted = False
 
-	for ref in doc.references:
-		outstanding = flt(ref.outstanding_amount)
-		allocated = flt(ref.allocated_amount)
+    for ref in doc.references:
+        outstanding = flt(ref.outstanding_amount)
+        allocated = flt(ref.allocated_amount)
 
-		# Calcola quanto manca da allocare su questa specifica fattura
-		remaining = outstanding - allocated
+        # Calcola quanto manca da allocare su questa specifica fattura
+        remaining = outstanding - allocated
 
-		# Se c'è un importo non allocato positivo (pagato di meno) ed è entro la soglia
-		if remaining > 0 and remaining <= threshold:
-			# Alloca l'intero importo outstanding
-			ref.allocated_amount = outstanding
-			adjusted = True
+        # Se c'è un importo non allocato positivo (pagato di meno) ed è entro la soglia
+        if remaining > 0 and remaining <= threshold:
+            # Alloca l'intero importo outstanding
+            ref.allocated_amount = outstanding
+            adjusted = True
 
-			frappe.msgprint(
-				_("Arrotondamento automatico applicato su fattura {0}: allocati {1} invece di {2} (differenza: {3})").format(
-					ref.reference_name,
-					frappe.format_value(outstanding, {"fieldtype": "Currency"}),
-					frappe.format_value(allocated, {"fieldtype": "Currency"}),
-					frappe.format_value(remaining, {"fieldtype": "Currency"})
-				),
-				title=_("Allocazione con Arrotondamento"),
-				indicator="blue"
-			)
+            frappe.msgprint(
+                _(
+                    "Arrotondamento automatico applicato su fattura {0}: allocati {1} invece di {2} (differenza: {3})"
+                ).format(
+                    ref.reference_name,
+                    frappe.format_value(outstanding, {"fieldtype": "Currency"}),
+                    frappe.format_value(allocated, {"fieldtype": "Currency"}),
+                    frappe.format_value(remaining, {"fieldtype": "Currency"}),
+                ),
+                title=_("Allocazione con Arrotondamento"),
+                indicator="blue",
+            )
 
-	# Forza il ricalcolo di total_allocated_amount, unallocated_amount e difference_amount
-	if adjusted:
-		doc.set_total_allocated_amount()
-		doc.set_unallocated_amount()
-		doc.set_difference_amount()
+    # Forza il ricalcolo di total_allocated_amount, unallocated_amount e difference_amount
+    if adjusted:
+        doc.set_total_allocated_amount()
+        doc.set_unallocated_amount()
+        doc.set_difference_amount()
 
 
 def handle_rounding(doc, method):
@@ -58,7 +62,9 @@ def handle_rounding(doc, method):
         return
 
     # Ottieni la soglia dalla Company
-    threshold = flt(frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50)
+    threshold = flt(
+        frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50
+    )
 
     # Determina quale campo gestire: unallocated_amount O difference_amount (non entrambi!)
     total_rounding = 0
@@ -87,12 +93,18 @@ def handle_rounding(doc, method):
         default_cost_center = frappe.get_value("Company", doc.company, "cost_center")
 
         if not rounding_account:
-            frappe.throw(_("Imposta Round Off Account in Company per abilitare l'arrotondamento automatico"))
+            frappe.throw(
+                _(
+                    "Imposta Round Off Account in Company per abilitare l'arrotondamento automatico"
+                )
+            )
         if not default_cost_center:
             frappe.throw(_("Imposta Default Cost Center in Company"))
 
         # Cerca o crea la riga di deduzione per l'arrotondamento
-        rounding_row = _find_or_create_rounding_deduction(doc, rounding_account, default_cost_center)
+        rounding_row = _find_or_create_rounding_deduction(
+            doc, rounding_account, default_cost_center
+        )
         rounding_row.amount = total_rounding * deduction_sign
 
         # Forza il ricalcolo di unallocated_amount e difference_amount
@@ -111,23 +123,27 @@ def handle_rounding(doc, method):
 
         # Mostra messaggio informativo all'utente
         frappe.msgprint(
-            _("Arrotondamento automatico applicato: {0}<br>Account utilizzato: {1}<br>La differenza di pagamento è stata gestita automaticamente.").format(
+            _(
+                "Arrotondamento automatico applicato: {0}<br>Account utilizzato: {1}<br>La differenza di pagamento è stata gestita automaticamente."
+            ).format(
                 frappe.format_value(total_rounding, {"fieldtype": "Currency"}),
-                rounding_account
+                rounding_account,
             ),
             title=_("Arrotondamento Automatico"),
-            indicator="blue"
+            indicator="blue",
         )
 
     elif total_rounding > threshold:
         # Mostra warning se supera la soglia ma non bloccare in validate
         frappe.msgprint(
-            _("Attenzione: differenza di {0} supera la soglia di arrotondamento automatico ({1}).<br>Verifica l'importo del pagamento prima del submit.").format(
+            _(
+                "Attenzione: differenza di {0} supera la soglia di arrotondamento automatico ({1}).<br>Verifica l'importo del pagamento prima del submit."
+            ).format(
                 frappe.format_value(total_rounding, {"fieldtype": "Currency"}),
-                frappe.format_value(threshold, {"fieldtype": "Currency"})
+                frappe.format_value(threshold, {"fieldtype": "Currency"}),
             ),
             title=_("Differenza Elevata"),
-            indicator="orange"
+            indicator="orange",
         )
 
 
@@ -143,11 +159,10 @@ def _find_or_create_rounding_deduction(doc, rounding_account, cost_center):
             return deduction
 
     # Se non esiste, creane una nuova
-    new_row = doc.append("deductions", {
-        "account": rounding_account,
-        "cost_center": cost_center,
-        "amount": 0
-    })
+    new_row = doc.append(
+        "deductions",
+        {"account": rounding_account, "cost_center": cost_center, "amount": 0},
+    )
     # Marca questa riga come arrotondamento automatico
     new_row._is_auto_rounding = True
     return new_row
@@ -179,12 +194,19 @@ def validate_rounding_on_submit(doc, method):
     rounding_account = frappe.get_value("Company", doc.company, "round_off_account")
 
     # Conta quante deductions di arrotondamento abbiamo
-    rounding_deductions = [d for d in doc.deductions if d.account == rounding_account] if rounding_account else []
+    rounding_deductions = (
+        [d for d in doc.deductions if d.account == rounding_account]
+        if rounding_account
+        else []
+    )
 
     # Se non ci sono deductions di arrotondamento ma dovrebbero esserci, riapplicale
     if not rounding_deductions:
         # Verifica se serve un arrotondamento
-        threshold = flt(frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50)
+        threshold = flt(
+            frappe.get_value("Company", doc.company, "payment_rounding_threshold")
+            or 0.50
+        )
         total_rounding = 0
 
         if flt(doc.unallocated_amount) > 0:
@@ -197,16 +219,20 @@ def validate_rounding_on_submit(doc, method):
             handle_rounding(doc, method)
 
     # Validazione finale: blocca se la differenza supera la soglia
-    threshold = flt(frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50)
+    threshold = flt(
+        frappe.get_value("Company", doc.company, "payment_rounding_threshold") or 0.50
+    )
     total_difference = abs(flt(doc.difference_amount))
 
     if total_difference > threshold:
         frappe.throw(
-            _("Impossibile procedere: differenza di {0} supera la soglia di arrotondamento automatico ({1}).<br>Verifica l'importo del pagamento o le allocazioni.").format(
+            _(
+                "Impossibile procedere: differenza di {0} supera la soglia di arrotondamento automatico ({1}).<br>Verifica l'importo del pagamento o le allocazioni."
+            ).format(
                 frappe.format_value(total_difference, {"fieldtype": "Currency"}),
-                frappe.format_value(threshold, {"fieldtype": "Currency"})
+                frappe.format_value(threshold, {"fieldtype": "Currency"}),
             ),
-            title=_("Differenza Troppo Elevata")
+            title=_("Differenza Troppo Elevata"),
         )
 
     # Crea il Payment Rounding Log se necessario

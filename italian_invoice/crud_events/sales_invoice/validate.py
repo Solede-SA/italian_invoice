@@ -79,7 +79,6 @@ def execute(doc, method=None):
         if original_invoice:
             if original_invoice.payment_schedule:
                 for payment_schedule in original_invoice.payment_schedule:
-
                     payment_schedule.name = None
                     payment_schedule.parent = None
 

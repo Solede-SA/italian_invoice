@@ -18,10 +18,10 @@ def recalculate_payment_schedule(sales_invoice_name):
         frappe.throw(_("Payment Terms Template has no terms"))
 
     # Delete existing payment schedule
-    frappe.db.delete("Payment Schedule", {
-        "parent": sales_invoice_name,
-        "parenttype": "Sales Invoice"
-    })
+    frappe.db.delete(
+        "Payment Schedule",
+        {"parent": sales_invoice_name, "parenttype": "Sales Invoice"},
+    )
 
     # Create new payment schedule
     for term_detail in template.terms:
@@ -46,21 +46,23 @@ def recalculate_payment_schedule(sales_invoice_name):
         payment_schedule.insert(ignore_permissions=True)
 
     # Update main due_date with the last payment schedule date
-    max_due_date = frappe.db.sql("""
+    max_due_date = frappe.db.sql(
+        """
         SELECT MAX(due_date)
         FROM `tabPayment Schedule`
         WHERE parent = %s AND parenttype = 'Sales Invoice'
-    """, sales_invoice_name)[0][0]
+    """,
+        sales_invoice_name,
+    )[0][0]
 
     if max_due_date:
-        frappe.db.set_value("Sales Invoice", sales_invoice_name, "due_date", max_due_date)
+        frappe.db.set_value(
+            "Sales Invoice", sales_invoice_name, "due_date", max_due_date
+        )
 
     frappe.db.commit()
 
-    return {
-        "success": True,
-        "message": _("Payment schedule recalculated successfully")
-    }
+    return {"success": True, "message": _("Payment schedule recalculated successfully")}
 
 
 def calculate_due_date(posting_date, term):

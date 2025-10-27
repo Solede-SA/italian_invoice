@@ -1,16 +1,10 @@
-import io
 import json
 import re
-import requests
 import frappe
 from frappe import _
-from frappe.utils import cstr, flt
+from frappe.utils import cstr
 from frappe.utils.file_manager import remove_file
-from frappe.utils import today
 from italian_invoice.validation import XMLInvoiceValidator, ValidationErrorFormatter
-
-from erpnext.controllers.taxes_and_totals import get_itemised_tax
-from erpnext.regional.italy import state_codes
 
 
 # Costanti per percorsi JSON fatture elettroniche
@@ -19,31 +13,84 @@ JSON_PATHS = {
         ["data", "data", "invoice", "payload"],
         ["data", "invoice", "payload"],
         ["invoice", "payload"],
-        ["payload"]
+        ["payload"],
     ],
     "fattura_body": [
         ["data", "data", "invoice", "payload", "fattura_elettronica_body"],
         ["data", "invoice", "payload", "fattura_elettronica_body"],
         ["invoice", "payload", "fattura_elettronica_body"],
         ["invoice", "fattura_elettronica_body"],
-        ["fattura_elettronica_body"]
+        ["fattura_elettronica_body"],
     ],
     "supplier_vat": [
-        ["data", "data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-        ["data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-        ["invoice", "payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-        ["payload", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-        ["fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-        ["cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"]
+        [
+            "data",
+            "data",
+            "invoice",
+            "payload",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+            "dati_anagrafici",
+            "id_fiscale_iva",
+            "id_codice",
+        ],
+        [
+            "data",
+            "invoice",
+            "payload",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+            "dati_anagrafici",
+            "id_fiscale_iva",
+            "id_codice",
+        ],
+        [
+            "invoice",
+            "payload",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+            "dati_anagrafici",
+            "id_fiscale_iva",
+            "id_codice",
+        ],
+        [
+            "payload",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+            "dati_anagrafici",
+            "id_fiscale_iva",
+            "id_codice",
+        ],
+        [
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+            "dati_anagrafici",
+            "id_fiscale_iva",
+            "id_codice",
+        ],
+        ["cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
     ],
     "cedente_prestatore": [
-        ["data", "data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore"],
-        ["data", "invoice", "payload", "fattura_elettronica_header", "cedente_prestatore"],
+        [
+            "data",
+            "data",
+            "invoice",
+            "payload",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+        ],
+        [
+            "data",
+            "invoice",
+            "payload",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+        ],
         ["invoice", "payload", "fattura_elettronica_header", "cedente_prestatore"],
         ["payload", "fattura_elettronica_header", "cedente_prestatore"],
         ["fattura_elettronica_header", "cedente_prestatore"],
-        ["cedente_prestatore"]
-    ]
+        ["cedente_prestatore"],
+    ],
 }
 
 
@@ -62,7 +109,9 @@ def get_value_from_json_paths(dati_fattura, paths):
         return None
 
     try:
-        dati = json.loads(dati_fattura) if isinstance(dati_fattura, str) else dati_fattura
+        dati = (
+            json.loads(dati_fattura) if isinstance(dati_fattura, str) else dati_fattura
+        )
 
         for path in paths:
             obj = dati
@@ -75,7 +124,7 @@ def get_value_from_json_paths(dati_fattura, paths):
                 return obj
 
         return None
-    except:
+    except Exception:
         return None
 
 
@@ -129,7 +178,9 @@ def get_invoice_number_from_json(invoice_data):
     if not body:
         frappe.throw("Impossibile estrarre il numero fattura dal JSON")
 
-    numero = body.get("dati_generali", {}).get("dati_generali_documento", {}).get("numero")
+    numero = (
+        body.get("dati_generali", {}).get("dati_generali_documento", {}).get("numero")
+    )
     if not numero:
         frappe.throw("Numero fattura non trovato nel JSON")
 
@@ -169,7 +220,7 @@ def get_invoice_total_from_json(invoice_data):
     try:
         totale = sum(float(riga.get("imponibile_importo", 0)) for riga in riepilogo)
         return totale
-    except:
+    except Exception:
         return None
 
 
@@ -182,7 +233,11 @@ def get_document_type_from_json(invoice_data):
     if not body:
         return None
 
-    return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento")
+    return (
+        body.get("dati_generali", {})
+        .get("dati_generali_documento", {})
+        .get("tipo_documento")
+    )
 
 
 def get_prefixed_company_tax_id(company_tax_id):
@@ -423,7 +478,9 @@ def get_invoice_data(doc):
         "tax_data": tax_data,
         "vat_collectability": vat_collectability,
         "payment_schedule": doc.payment_schedule,
-        "custom_bank_account": doc.custom_bank_account if hasattr(doc, "custom_bank_account") else None,
+        "custom_bank_account": doc.custom_bank_account
+        if hasattr(doc, "custom_bank_account")
+        else None,
         "apply_discount_on": doc.apply_discount_on,
         # "stamp_duty": doc.stamp_duty,
     }
@@ -588,13 +645,11 @@ def get_invoice_data(doc):
 
 
 def get_invoice_summary(items, taxes):
-
     for item in items:
         print("item.tax_rate", item.tax_rate)
 
     summary_data = frappe._dict()
     for tax in taxes:
-
         # Include only VAT charges.
         if tax.charge_type == "Actual":
             continue
@@ -650,12 +705,12 @@ def get_invoice_summary(items, taxes):
                     summary_data[key]["tax_amount"] += item.tax_amount
                     summary_data[key]["taxable_amount"] += item.net_amount
                     if key == "0.0":
-                        summary_data[key][
-                            "tax_exemption_reason"
-                        ] = tax.custom_motivo_esenzione_iva
-                        summary_data[key][
-                            "tax_exemption_law"
-                        ] = tax.custom_riferimento_normativo
+                        summary_data[key]["tax_exemption_reason"] = (
+                            tax.custom_motivo_esenzione_iva
+                        )
+                        summary_data[key]["tax_exemption_law"] = (
+                            tax.custom_riferimento_normativo
+                        )
 
             if summary_data.get("0.0") and tax.charge_type in [
                 "On Previous Row Total",
@@ -949,7 +1004,7 @@ def validate_invoice(docname, doctype):
     xml_file = frappe.get_site_path("private", "files", e_invoice_fileDoc.file_name)
 
     # Leggi contenuto XML
-    with open(xml_file, 'r', encoding='utf-8') as f:
+    with open(xml_file, "r", encoding="utf-8") as f:
         xml_content = f.read()
 
     # Valida con nuovo sistema
@@ -963,8 +1018,8 @@ def validate_invoice(docname, doctype):
 
         # Solleva eccezione con sommario
         frappe.throw(
-            _("Validazione fallita. {0}").format(report['summary']),
-            title=_("Errore di validazione fattura elettronica")
+            _("Validazione fallita. {0}").format(report["summary"]),
+            title=_("Errore di validazione fattura elettronica"),
         )
 
     return e_invoice_fileDoc.file_url
@@ -987,9 +1042,11 @@ def get_sdi_provider(company_name):
 
     if provider_type == "OpenAPI":
         from italian_invoice.providers.openapi_provider import OpenAPIProvider
+
         provider = OpenAPIProvider()
     elif provider_type == "Manual":
         from italian_invoice.providers.manual_provider import ManualProvider
+
         provider = ManualProvider()
     else:
         # Provider custom
@@ -1032,9 +1089,14 @@ def identify_company_from_webhook_data(data):
 
         body = invoice_data.get("fattura_elettronica_body", [])
         if body and len(body) > 0:
-            tipo_documento = body[0].get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento", "")
+            tipo_documento = (
+                body[0]
+                .get("dati_generali", {})
+                .get("dati_generali_documento", {})
+                .get("tipo_documento", "")
+            )
             print(f"Tipo documento: {tipo_documento}")
-    except:
+    except Exception:
         pass
 
     # Per autofatture (TD17-TD19) o quando il cedente è estero, cerchiamo in modi diversi
@@ -1043,62 +1105,180 @@ def identify_company_from_webhook_data(data):
     # Controlla se il cedente è estero
     cedente_paese = None
     try:
-        cedente_path = ["data", "invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_paese"]
+        cedente_path = [
+            "data",
+            "invoice",
+            "fattura_elettronica_header",
+            "cedente_prestatore",
+            "dati_anagrafici",
+            "id_fiscale_iva",
+            "id_paese",
+        ]
         cedente_paese = get_nested_value(data, cedente_path)
         if not cedente_paese:
-            cedente_path = ["invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_paese"]
+            cedente_path = [
+                "invoice",
+                "fattura_elettronica_header",
+                "cedente_prestatore",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_paese",
+            ]
             cedente_paese = get_nested_value(data, cedente_path)
-    except:
+    except Exception:
         pass
 
     is_foreign_supplier = cedente_paese and cedente_paese != "IT"
-    print(f"Is autofattura: {is_autofattura}, Foreign supplier: {is_foreign_supplier}, Paese: {cedente_paese}")
+    print(
+        f"Is autofattura: {is_autofattura}, Foreign supplier: {is_foreign_supplier}, Paese: {cedente_paese}"
+    )
 
     if event_type == "customer-notification":
         if is_autofattura or is_foreign_supplier:
             # Per autofatture, cerchiamo nei dati di trasmissione o nel cessionario
             possible_paths = [
                 # Prima prova nel codice trasmittente (chi ha inviato il file)
-                ["data", "invoice", "fattura_elettronica_header", "dati_trasmissione", "id_trasmittente", "id_codice"],
-                ["invoice", "fattura_elettronica_header", "dati_trasmissione", "id_trasmittente", "id_codice"],
+                [
+                    "data",
+                    "invoice",
+                    "fattura_elettronica_header",
+                    "dati_trasmissione",
+                    "id_trasmittente",
+                    "id_codice",
+                ],
+                [
+                    "invoice",
+                    "fattura_elettronica_header",
+                    "dati_trasmissione",
+                    "id_trasmittente",
+                    "id_codice",
+                ],
                 # Poi nel cessionario (per autofatture potrebbe essere la nostra azienda)
-                ["data", "invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-                ["invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+                [
+                    "data",
+                    "invoice",
+                    "fattura_elettronica_header",
+                    "cessionario_committente",
+                    "dati_anagrafici",
+                    "id_fiscale_iva",
+                    "id_codice",
+                ],
+                [
+                    "invoice",
+                    "fattura_elettronica_header",
+                    "cessionario_committente",
+                    "dati_anagrafici",
+                    "id_fiscale_iva",
+                    "id_codice",
+                ],
             ]
         else:
             # Per fatture normali, la nostra company è il CEDENTE (chi emette)
             possible_paths = [
-                ["data", "invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-                ["invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+                [
+                    "data",
+                    "invoice",
+                    "fattura_elettronica_header",
+                    "cedente_prestatore",
+                    "dati_anagrafici",
+                    "id_fiscale_iva",
+                    "id_codice",
+                ],
+                [
+                    "invoice",
+                    "fattura_elettronica_header",
+                    "cedente_prestatore",
+                    "dati_anagrafici",
+                    "id_fiscale_iva",
+                    "id_codice",
+                ],
             ]
     elif event_type == "supplier-invoice":
         # Per fatture fornitori, la nostra company è il CESSIONARIO (chi riceve)
         # Nota: supplier-invoice può avere la struttura con "payload"
         possible_paths = [
             # Con payload
-            ["data", "invoice", "payload", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["invoice", "payload", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            [
+                "data",
+                "invoice",
+                "payload",
+                "fattura_elettronica_header",
+                "cessionario_committente",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
+            [
+                "invoice",
+                "payload",
+                "fattura_elettronica_header",
+                "cessionario_committente",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
             # Senza payload (vecchio formato)
-            ["data", "invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            [
+                "data",
+                "invoice",
+                "fattura_elettronica_header",
+                "cessionario_committente",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
+            [
+                "invoice",
+                "fattura_elettronica_header",
+                "cessionario_committente",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
         ]
     else:
         # Fallback: prova entrambi
         possible_paths = [
             # Prima prova come cedente (fatture attive)
-            ["data", "invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["invoice", "fattura_elettronica_header", "cedente_prestatore", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            [
+                "data",
+                "invoice",
+                "fattura_elettronica_header",
+                "cedente_prestatore",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
+            [
+                "invoice",
+                "fattura_elettronica_header",
+                "cedente_prestatore",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
             # Poi come cessionario (fatture passive)
-            ["data", "invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
-            ["invoice", "fattura_elettronica_header", "cessionario_committente", "dati_anagrafici", "id_fiscale_iva", "id_codice"],
+            [
+                "data",
+                "invoice",
+                "fattura_elettronica_header",
+                "cessionario_committente",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
+            [
+                "invoice",
+                "fattura_elettronica_header",
+                "cessionario_committente",
+                "dati_anagrafici",
+                "id_fiscale_iva",
+                "id_codice",
+            ],
         ]
 
     # Aggiungi sempre i campi diretti come fallback
-    possible_paths.extend([
-        ["company_tax_id"],
-        ["fiscal_id"],
-        ["tax_id"]
-    ])
+    possible_paths.extend([["company_tax_id"], ["fiscal_id"], ["tax_id"]])
 
     for path in possible_paths:
         tax_id = get_nested_value(data, path)
@@ -1131,7 +1311,11 @@ def handle_sdi_webhook(endpoint, data):
     Per supplier-invoice: identifica la company dal cessionario
     """
     try:
-        if endpoint in ["customer_notification", "customer_invoice", "legal_storage_receipt"]:
+        if endpoint in [
+            "customer_notification",
+            "customer_invoice",
+            "legal_storage_receipt",
+        ]:
             # Per notifiche e ricevute, l'UUID identifica univocamente la transazione
             uuid = None
 
@@ -1159,7 +1343,7 @@ def handle_sdi_webhook(endpoint, data):
             transazioni = frappe.get_list(
                 "Transazione SDI",
                 filters={"uuid": uuid},
-                fields=["name", "tipo_fattura", "fattura"]
+                fields=["name", "tipo_fattura", "fattura"],
             )
 
             if not transazioni:
@@ -1173,17 +1357,19 @@ def handle_sdi_webhook(endpoint, data):
         elif endpoint == "supplier_invoice":
             # Per fatture fornitori, identifica la company dal cessionario
             from italian_invoice.providers.openapi_provider import OpenAPIProvider
+
             provider_temp = OpenAPIProvider()
 
             partita_iva_company = provider_temp._search_value_in_json(
-                data,
-                "cessionario_committente.dati_anagrafici.id_fiscale_iva.id_codice"
+                data, "cessionario_committente.dati_anagrafici.id_fiscale_iva.id_codice"
             )
 
             if not partita_iva_company:
                 frappe.throw("Partita IVA company non trovata nel webhook")
 
-            company_list = frappe.get_list("Company", filters={"tax_id": partita_iva_company})
+            company_list = frappe.get_list(
+                "Company", filters={"tax_id": partita_iva_company}
+            )
 
             if not company_list:
                 frappe.throw(f"Company non trovata con P.IVA: {partita_iva_company}")
@@ -1195,8 +1381,11 @@ def handle_sdi_webhook(endpoint, data):
             # Se non riesci, logga e ritorna successo
             try:
                 company = identify_company_from_webhook_data(data)
-            except:
-                frappe.log_error(f"Impossibile identificare company per {endpoint}, webhook ignorato", "SDI Webhook Warning")
+            except Exception:
+                frappe.log_error(
+                    f"Impossibile identificare company per {endpoint}, webhook ignorato",
+                    "SDI Webhook Warning",
+                )
                 return {"success": True, "message": f"OK from {endpoint}"}
 
         else:
@@ -1209,7 +1398,9 @@ def handle_sdi_webhook(endpoint, data):
         return provider.handle_webhook(endpoint, data)
 
     except Exception as e:
-        frappe.log_error(f"Errore gestione webhook {endpoint}: {str(e)}", "SDI Webhook Error")
+        frappe.log_error(
+            f"Errore gestione webhook {endpoint}: {str(e)}", "SDI Webhook Error"
+        )
         raise
 
 

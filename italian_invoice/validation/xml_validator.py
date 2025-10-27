@@ -8,8 +8,7 @@ import xmlschema
 from lxml import etree
 import logging
 import re
-from typing import Dict, List, Tuple, Optional
-from pathlib import Path
+from typing import Dict, Tuple
 
 logger = logging.getLogger("italian_invoice.validation")
 
@@ -18,7 +17,9 @@ class XMLInvoiceValidator:
     """Validatore per fatture elettroniche con gestione errori migliorata"""
 
     def __init__(self):
-        self.xsd_path = frappe.get_app_path("italian_invoice", "utilities/schema_vfpr12.xsd")
+        self.xsd_path = frappe.get_app_path(
+            "italian_invoice", "utilities/schema_vfpr12.xsd"
+        )
         self.schema = None
         self.errors = []
         self.warnings = []
@@ -65,20 +66,22 @@ class XMLInvoiceValidator:
     def _validate_xml_structure(self, xml_content: str) -> bool:
         """Valida struttura XML base"""
         try:
-            etree.fromstring(xml_content.encode('utf-8'))
+            etree.fromstring(xml_content.encode("utf-8"))
             logger.debug("Struttura XML valida")
             return True
         except etree.XMLSyntaxError as e:
-            line_no = e.lineno if hasattr(e, 'lineno') else 0
-            self.errors.append({
-                'type': 'XML_SYNTAX',
-                'severity': 'critical',
-                'message': 'Errore sintassi XML',
-                'details': str(e),
-                'line': line_no,
-                'field': None,
-                'suggestion': 'Verifica che il file XML sia ben formato'
-            })
+            line_no = e.lineno if hasattr(e, "lineno") else 0
+            self.errors.append(
+                {
+                    "type": "XML_SYNTAX",
+                    "severity": "critical",
+                    "message": "Errore sintassi XML",
+                    "details": str(e),
+                    "line": line_no,
+                    "field": None,
+                    "suggestion": "Verifica che il file XML sia ben formato",
+                }
+            )
             return False
 
     def _validate_xsd_schema(self, xml_content: str) -> bool:
@@ -97,15 +100,17 @@ class XMLInvoiceValidator:
             self._parse_xsd_error(e)
             return False
         except Exception as e:
-            self.errors.append({
-                'type': 'XSD_VALIDATION',
-                'severity': 'critical',
-                'message': 'Errore validazione XSD',
-                'details': str(e),
-                'line': None,
-                'field': None,
-                'suggestion': 'Contatta il supporto tecnico'
-            })
+            self.errors.append(
+                {
+                    "type": "XSD_VALIDATION",
+                    "severity": "critical",
+                    "message": "Errore validazione XSD",
+                    "details": str(e),
+                    "line": None,
+                    "field": None,
+                    "suggestion": "Contatta il supporto tecnico",
+                }
+            )
             return False
 
     def _parse_xsd_error(self, error: xmlschema.XMLSchemaException):
@@ -128,18 +133,18 @@ class XMLInvoiceValidator:
         # Costruisci messaggio generico ma informativo
         if xml_path:
             # Pulisci il path
-            path_parts = xml_path.split('/')
+            path_parts = xml_path.split("/")
             clean_parts = []
             for p in path_parts:
                 if p:
                     # Rimuovi namespace {http://...}
-                    p = re.sub(r'\{.*?\}', '', p)
+                    p = re.sub(r"\{.*?\}", "", p)
                     # Rimuovi prefisso p:
-                    p = re.sub(r'^\w+:', '', p)
+                    p = re.sub(r"^\w+:", "", p)
                     clean_parts.append(p)
 
             # Path leggibile
-            readable_path = ' → '.join(clean_parts) if clean_parts else xml_path
+            readable_path = " → ".join(clean_parts) if clean_parts else xml_path
 
             # Prendi l'ultimo elemento come nome campo
             field_name = clean_parts[-1] if clean_parts else None
@@ -147,44 +152,52 @@ class XMLInvoiceValidator:
             if value and field_name:
                 message = f'Il valore "{value}" non rispetta il formato richiesto nel campo {field_name} (percorso: {readable_path})'
             elif field_name:
-                message = f'Errore nel campo {field_name} (percorso: {readable_path})'
+                message = f"Errore nel campo {field_name} (percorso: {readable_path})"
             elif value:
-                message = f'Il valore "{value}" non è valido (percorso: {readable_path})'
+                message = (
+                    f'Il valore "{value}" non è valido (percorso: {readable_path})'
+                )
             else:
-                message = f'Errore di validazione (percorso: {readable_path})'
+                message = f"Errore di validazione (percorso: {readable_path})"
         else:
             # Senza path
             if value:
                 message = f'Il valore "{value}" non è valido'
             else:
                 # Mantieni almeno parte dell'errore originale
-                message = f'Errore validazione: {error_str[:150]}...' if len(error_str) > 150 else f'Errore validazione: {error_str}'
+                message = (
+                    f"Errore validazione: {error_str[:150]}..."
+                    if len(error_str) > 150
+                    else f"Errore validazione: {error_str}"
+                )
 
         # Suggerimento generico basato sul contenuto dell'errore
-        suggestion = 'Verifica il formato secondo le specifiche FatturaPA'
-        if 'pattern' in error_str.lower():
-            suggestion = 'Verifica che il valore rispetti il formato richiesto'
-        elif 'missing' in error_str.lower():
-            suggestion = 'Aggiungi i campi obbligatori mancanti'
-        elif 'not expected' in error_str.lower():
-            suggestion = 'Rimuovi o correggi gli elementi non previsti'
+        suggestion = "Verifica il formato secondo le specifiche FatturaPA"
+        if "pattern" in error_str.lower():
+            suggestion = "Verifica che il valore rispetti il formato richiesto"
+        elif "missing" in error_str.lower():
+            suggestion = "Aggiungi i campi obbligatori mancanti"
+        elif "not expected" in error_str.lower():
+            suggestion = "Rimuovi o correggi gli elementi non previsti"
 
-        self.errors.append({
-            'type': 'XSD_VALIDATION',
-            'severity': 'error',
-            'message': message,
-            'details': error_str,
-            'line': getattr(error, 'sourceline', None),
-            'field': field_name if xml_path else None,
-            'path': xml_path,
-            'suggestion': suggestion
-        })
+        self.errors.append(
+            {
+                "type": "XSD_VALIDATION",
+                "severity": "error",
+                "message": message,
+                "details": error_str,
+                "line": getattr(error, "sourceline", None),
+                "field": field_name if xml_path else None,
+                "path": xml_path,
+                "suggestion": suggestion,
+            }
+        )
 
     def _validate_business_rules(self, xml_content: str, doc=None):
         """Validazioni specifiche business italiane"""
         try:
-            root = etree.fromstring(xml_content.encode('utf-8'))
-            ns = {'ns': 'http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2'}
+            root = etree.fromstring(xml_content.encode("utf-8"))
+            ns = {"ns": "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"}
 
             # Valida Partita IVA
             self._validate_vat_numbers(root, ns)
@@ -207,65 +220,73 @@ class XMLInvoiceValidator:
     def _validate_vat_numbers(self, root, ns):
         """Valida partite IVA"""
         # Cedente/Prestatore
-        vat_elements = root.xpath('//ns:CedentePrestatore//ns:IdCodice', namespaces=ns)
+        vat_elements = root.xpath("//ns:CedentePrestatore//ns:IdCodice", namespaces=ns)
         for elem in vat_elements:
             vat = elem.text
             if vat and not self._is_valid_vat(vat):
-                self.warnings.append({
-                    'type': 'BUSINESS_RULE',
-                    'severity': 'warning',
-                    'message': f'Partita IVA potrebbe non essere valida: {vat}',
-                    'field': 'IdCodice',
-                    'suggestion': 'Verifica la correttezza della P.IVA (11 cifre)'
-                })
+                self.warnings.append(
+                    {
+                        "type": "BUSINESS_RULE",
+                        "severity": "warning",
+                        "message": f"Partita IVA potrebbe non essere valida: {vat}",
+                        "field": "IdCodice",
+                        "suggestion": "Verifica la correttezza della P.IVA (11 cifre)",
+                    }
+                )
 
     def _validate_fiscal_codes(self, root, ns):
         """Valida codici fiscali"""
-        cf_elements = root.xpath('//ns:CodiceFiscale', namespaces=ns)
+        cf_elements = root.xpath("//ns:CodiceFiscale", namespaces=ns)
         for elem in cf_elements:
             cf = elem.text
             if cf and not self._is_valid_fiscal_code(cf):
-                self.warnings.append({
-                    'type': 'BUSINESS_RULE',
-                    'severity': 'warning',
-                    'message': f'Codice Fiscale potrebbe non essere valido: {cf}',
-                    'field': 'CodiceFiscale',
-                    'suggestion': 'Verifica formato CF (16 caratteri alfanumerici)'
-                })
+                self.warnings.append(
+                    {
+                        "type": "BUSINESS_RULE",
+                        "severity": "warning",
+                        "message": f"Codice Fiscale potrebbe non essere valido: {cf}",
+                        "field": "CodiceFiscale",
+                        "suggestion": "Verifica formato CF (16 caratteri alfanumerici)",
+                    }
+                )
 
     def _validate_dates(self, root, ns):
         """Valida date documento"""
         from datetime import datetime, timedelta
 
-        date_elements = root.xpath('//ns:Data', namespaces=ns)
+        date_elements = root.xpath("//ns:Data", namespaces=ns)
         today = datetime.now().date()
 
         for elem in date_elements:
             try:
                 date_str = elem.text
-                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
 
                 # Data futura
                 if date_obj > today:
-                    parent = elem.getparent().tag.split('}')[-1]
-                    self.warnings.append({
-                        'type': 'BUSINESS_RULE',
-                        'severity': 'warning',
-                        'message': f'Data futura in {parent}: {date_str}',
-                        'field': parent,
-                        'suggestion': 'Verifica che la data sia corretta'
-                    })
+                    parent = elem.getparent().tag.split("}")[-1]
+                    self.warnings.append(
+                        {
+                            "type": "BUSINESS_RULE",
+                            "severity": "warning",
+                            "message": f"Data futura in {parent}: {date_str}",
+                            "field": parent,
+                            "suggestion": "Verifica che la data sia corretta",
+                        }
+                    )
 
                 # Data troppo vecchia (> 1 anno)
                 if date_obj < today - timedelta(days=365):
-                    parent = elem.getparent().tag.split('}')[-1]
-                    self.warnings.append({
-                        'type': 'BUSINESS_RULE',
-                        'severity': 'info',
-                        'message': f'Data molto vecchia in {parent}: {date_str}',
-                        'field': parent,
-                        'suggestion': 'Verifica che la data sia corretta'
-                    })
+                    parent = elem.getparent().tag.split("}")[-1]
+                    self.warnings.append(
+                        {
+                            "type": "BUSINESS_RULE",
+                            "severity": "info",
+                            "message": f"Data molto vecchia in {parent}: {date_str}",
+                            "field": parent,
+                            "suggestion": "Verifica che la data sia corretta",
+                        }
+                    )
 
             except ValueError:
                 pass  # Già gestito da XSD
@@ -275,51 +296,57 @@ class XMLInvoiceValidator:
         # Verifica coerenza totali
         try:
             # Somma imponibili
-            imponibili = root.xpath('//ns:ImponibileImporto', namespaces=ns)
+            imponibili = root.xpath("//ns:ImponibileImporto", namespaces=ns)
             total_imponibile = sum(float(i.text) for i in imponibili if i.text)
 
             # Totale documento
-            totale_elem = root.xpath('//ns:ImportoTotaleDocumento', namespaces=ns)
+            totale_elem = root.xpath("//ns:ImportoTotaleDocumento", namespaces=ns)
             if totale_elem and totale_elem[0].text:
                 totale = float(totale_elem[0].text)
 
                 # Tolleranza di 1 euro per arrotondamenti
                 if abs(totale - total_imponibile) > 1 and total_imponibile > 0:
-                    self.warnings.append({
-                        'type': 'BUSINESS_RULE',
-                        'severity': 'warning',
-                        'message': f'Possibile discrepanza nei totali: imponibile={total_imponibile:.2f}, totale={totale:.2f}',
-                        'field': 'ImportoTotaleDocumento',
-                        'suggestion': 'Verifica il calcolo dei totali'
-                    })
+                    self.warnings.append(
+                        {
+                            "type": "BUSINESS_RULE",
+                            "severity": "warning",
+                            "message": f"Possibile discrepanza nei totali: imponibile={total_imponibile:.2f}, totale={totale:.2f}",
+                            "field": "ImportoTotaleDocumento",
+                            "suggestion": "Verifica il calcolo dei totali",
+                        }
+                    )
         except Exception:
             pass  # Non critico
 
     def _validate_recipient_code(self, root, ns):
         """Valida codice destinatario"""
-        cod_dest = root.xpath('//ns:CodiceDestinatario', namespaces=ns)
+        cod_dest = root.xpath("//ns:CodiceDestinatario", namespaces=ns)
         if cod_dest and cod_dest[0].text:
             code = cod_dest[0].text
 
             # Verifica formato (7 caratteri alfanumerici o 0000000)
-            if not re.match(r'^[A-Z0-9]{7}$', code):
-                self.errors.append({
-                    'type': 'BUSINESS_RULE',
-                    'severity': 'error',
-                    'message': f'Codice Destinatario non valido: {code}',
-                    'field': 'CodiceDestinatario',
-                    'suggestion': 'Usa 7 caratteri alfanumerici o "0000000" per privati'
-                })
+            if not re.match(r"^[A-Z0-9]{7}$", code):
+                self.errors.append(
+                    {
+                        "type": "BUSINESS_RULE",
+                        "severity": "error",
+                        "message": f"Codice Destinatario non valido: {code}",
+                        "field": "CodiceDestinatario",
+                        "suggestion": 'Usa 7 caratteri alfanumerici o "0000000" per privati',
+                    }
+                )
 
             # Warning per codice generico
-            if code == '0000000':
-                self.warnings.append({
-                    'type': 'BUSINESS_RULE',
-                    'severity': 'info',
-                    'message': 'Codice Destinatario generico (0000000)',
-                    'field': 'CodiceDestinatario',
-                    'suggestion': 'Assicurati che il cliente abbia fornito la PEC'
-                })
+            if code == "0000000":
+                self.warnings.append(
+                    {
+                        "type": "BUSINESS_RULE",
+                        "severity": "info",
+                        "message": "Codice Destinatario generico (0000000)",
+                        "field": "CodiceDestinatario",
+                        "suggestion": "Assicurati che il cliente abbia fornito la PEC",
+                    }
+                )
 
     def _is_valid_vat(self, vat: str) -> bool:
         """Verifica base P.IVA italiana (11 cifre)"""
@@ -335,18 +362,18 @@ class XMLInvoiceValidator:
         if len(cf) != 16:
             return False
         # Pattern base CF
-        pattern = r'^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$'
+        pattern = r"^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
         return bool(re.match(pattern, cf))
 
     def _create_report(self) -> Dict:
         """Crea report di validazione"""
         return {
-            'valid': len(self.errors) == 0,
-            'errors': self.errors,
-            'warnings': self.warnings,
-            'error_count': len(self.errors),
-            'warning_count': len(self.warnings),
-            'summary': self._create_summary()
+            "valid": len(self.errors) == 0,
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "error_count": len(self.errors),
+            "warning_count": len(self.warnings),
+            "summary": self._create_summary(),
         }
 
     def _create_summary(self) -> str:

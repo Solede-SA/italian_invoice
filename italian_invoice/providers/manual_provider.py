@@ -71,7 +71,9 @@ class ManualProvider(SDIProvider):
             }
 
         except Exception as e:
-            frappe.log_error(f"Errore provider manuale: {str(e)}", "Manual Provider Error")
+            frappe.log_error(
+                f"Errore provider manuale: {str(e)}", "Manual Provider Error"
+            )
             return {
                 "success": False,
                 "message": f"Errore salvataggio: {str(e)}",
@@ -106,7 +108,9 @@ class ManualProvider(SDIProvider):
             frappe.throw(f"File con UUID {uuid} non trovato")
 
         except Exception as e:
-            frappe.log_error(f"Errore download manuale: {str(e)}", "Manual Provider Error")
+            frappe.log_error(
+                f"Errore download manuale: {str(e)}", "Manual Provider Error"
+            )
             frappe.throw(f"Errore download: {str(e)}")
 
     def get_invoice_status(self, uuid: str, company) -> dict:

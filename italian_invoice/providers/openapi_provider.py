@@ -7,7 +7,6 @@ Estratto dal codice esistente in openapi/api/sdi/
 import frappe
 import requests
 import json
-from datetime import datetime
 from dateutil.parser import parse
 import pytz
 import logging
@@ -31,9 +30,15 @@ class OpenAPIProvider(SDIProvider):
     def get_invoice_service_name(self, company):
         """Determina il nome del servizio in base alle configurazioni company"""
         name = "invoices"
-        if hasattr(company, "custom_apply_signature") and company.custom_apply_signature:
+        if (
+            hasattr(company, "custom_apply_signature")
+            and company.custom_apply_signature
+        ):
             name += "_signature"
-        if hasattr(company, "custom_apply_legal_storage") and company.custom_apply_legal_storage:
+        if (
+            hasattr(company, "custom_apply_legal_storage")
+            and company.custom_apply_legal_storage
+        ):
             name += "_legal_storage"
         return name
 
@@ -78,21 +83,18 @@ class OpenAPIProvider(SDIProvider):
                 return {
                     "success": True,
                     "uuid": uuid,
-                    "message": f"Fattura inviata: {response.json()['data']}"
+                    "message": f"Fattura inviata: {response.json()['data']}",
                 }
             else:
                 message = response.json().get("message", response.content)
                 return {
                     "success": False,
-                    "message": f"Errore nella richiesta: {message}"
+                    "message": f"Errore nella richiesta: {message}",
                 }
 
         except Exception as e:
             self.logger.exception(f"Errore invio fattura: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Errore invio fattura: {str(e)}"
-            }
+            return {"success": False, "message": f"Errore invio fattura: {str(e)}"}
 
     def download_invoice(self, uuid: str, format: str, company) -> bytes:
         """
@@ -183,7 +185,9 @@ class OpenAPIProvider(SDIProvider):
                 data_notifica = notification_data["notification"]["created_at"]
                 stato = notification_data["notification"]["type"]
                 if stato == "NE":
-                    stato = notification_data["notification"]["message"]["esito_committente"]["esito"]
+                    stato = notification_data["notification"]["message"][
+                        "esito_committente"
+                    ]["esito"]
 
             elif event == "customer-invoice":
                 # I dati potrebbero essere avvolti in "data" o essere diretti
@@ -196,7 +200,9 @@ class OpenAPIProvider(SDIProvider):
                 # I dati potrebbero essere avvolti in "data" o essere diretti
                 receipt_data = data.get("data", data)
                 uuid = receipt_data["object_id"]
-                data_notifica = receipt_data.get("receipt_received_at", receipt_data["updated_at"])
+                data_notifica = receipt_data.get(
+                    "receipt_received_at", receipt_data["updated_at"]
+                )
                 stato = None  # Non cambiare stato per ricevute conservazione
 
             # Trova e aggiorna transazione
@@ -208,13 +214,17 @@ class OpenAPIProvider(SDIProvider):
                 )
 
                 if lista_transazioni:
-                    transazione = frappe.get_doc("Transazione SDI", lista_transazioni[0]["name"])
+                    transazione = frappe.get_doc(
+                        "Transazione SDI", lista_transazioni[0]["name"]
+                    )
 
                     # Converti data
                     data_notifica_parsed = parse(data_notifica)
                     rome_tz = pytz.timezone("Europe/Rome")
                     data_notifica_rome = data_notifica_parsed.astimezone(rome_tz)
-                    formatted_data_notifica = data_notifica_rome.strftime("%Y-%m-%d %H:%M:%S")
+                    formatted_data_notifica = data_notifica_rome.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
 
                     # Salva notifica
                     formatted_original_data = json.dumps(notification_data, indent=2)
@@ -240,7 +250,9 @@ class OpenAPIProvider(SDIProvider):
 
                     # Aggiorna Sales Invoice solo se lo stato è cambiato
                     if stato:
-                        fattura = frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
+                        fattura = frappe.get_doc(
+                            transazione.tipo_fattura, transazione.fattura
+                        )
                         fattura.save()
 
                     return {"success": True, "message": f"Notifica {event} elaborata"}
@@ -311,19 +323,31 @@ class OpenAPIProvider(SDIProvider):
             if endpoint == "supplier_invoice":
                 return self._handle_supplier_invoice(data)
             elif endpoint == "customer_notification":
-                return self.handle_notification({"event": "customer-notification", "data": data})
+                return self.handle_notification(
+                    {"event": "customer-notification", "data": data}
+                )
             elif endpoint == "customer_invoice":
-                return self.handle_notification({"event": "customer-invoice", "data": data})
+                return self.handle_notification(
+                    {"event": "customer-invoice", "data": data}
+                )
             elif endpoint == "legal_storage_receipt":
-                return self.handle_notification({"event": "legal-storage-receipt", "data": data})
+                return self.handle_notification(
+                    {"event": "legal-storage-receipt", "data": data}
+                )
             elif endpoint == "invoice_status_quarantena":
                 self.logger.info(f"Quarantena webhook: {data}")
                 return {"success": True, "message": "OK from invoice_status_quarantena"}
             elif endpoint == "invoice_status_invoice_error":
                 self.logger.info(f"Invoice error webhook: {data}")
-                return {"success": True, "message": "OK from invoice_status_invoice_error"}
+                return {
+                    "success": True,
+                    "message": "OK from invoice_status_invoice_error",
+                }
             else:
-                return {"success": False, "message": f"Endpoint non riconosciuto: {endpoint}"}
+                return {
+                    "success": False,
+                    "message": f"Endpoint non riconosciuto: {endpoint}",
+                }
 
         except Exception as e:
             self.logger.exception(f"Errore gestione webhook {endpoint}: {str(e)}")
@@ -345,7 +369,9 @@ class OpenAPIProvider(SDIProvider):
             uuid = self._search_value_in_json(data, "invoice.uuid")
 
             # Trova company
-            company_list = frappe.get_list("Company", filters={"tax_id": partita_iva_company})
+            company_list = frappe.get_list(
+                "Company", filters={"tax_id": partita_iva_company}
+            )
             if not company_list:
                 frappe.throw(f"Company non trovata: {partita_iva_company}")
 
@@ -353,7 +379,9 @@ class OpenAPIProvider(SDIProvider):
 
             # Crea documento fattura fornitore
             fattura_fornitore = frappe.new_doc("Fattura Fornitori SDI")
-            fattura_fornitore.dati_fattura = json.dumps({"event": "supplier-invoice", "data": data}, indent=2)
+            fattura_fornitore.dati_fattura = json.dumps(
+                {"event": "supplier-invoice", "data": data}, indent=2
+            )
             fattura_fornitore.uuid = uuid
             fattura_fornitore.company = company
             fattura_fornitore.partita_iva_fornitore = partita_iva_fornitore
@@ -408,7 +436,9 @@ class OpenAPIProvider(SDIProvider):
         """
         try:
             # Prepara dati
-            config["apply_legal_storage"] = bool(config.get("apply_legal_storage", False))
+            config["apply_legal_storage"] = bool(
+                config.get("apply_legal_storage", False)
+            )
             config["apply_signature"] = bool(config.get("apply_signature", False))
 
             url = self.get_service_url("SDI", "business_registry_configurations")
