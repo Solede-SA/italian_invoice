@@ -1,0 +1,86 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger su tag tipo v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Necessario per ottenere tutta la storia
+
+      - name: Get tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION=${{ steps.tag.outputs.tag }}
+
+          # Estrai sezione del CHANGELOG per questa versione
+          if [ -f "CHANGELOG.md" ]; then
+            # Cerca la sezione della versione e estrai fino alla prossima versione
+            CHANGELOG=$(awk "/## \[${VERSION#v}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md)
+
+            # Se non trova niente, usa tutto il changelog
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG=$(cat CHANGELOG.md)
+            fi
+
+            # Salva in file temporaneo per multiline
+            echo "$CHANGELOG" > /tmp/changelog.txt
+
+            # Imposta output usando heredoc per multiline
+            {
+              echo 'notes<<EOF'
+              cat /tmp/changelog.txt
+              echo EOF
+            } >> $GITHUB_OUTPUT
+          else
+            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          body: |
+            # ${{ steps.tag.outputs.tag }} - Solede OpenBanking
+
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
+
+            ## 📦 Installation
+
+            ```bash
+            cd frappe-bench
+            bench get-app https://github.com/Solede-SA/solede_openbanking.git
+            bench --site your-site.local install-app solede_openbanking
+            bench --site your-site.local migrate
+            bench restart
+            ```
+
+            ## 📄 License
+
+            This software is licensed under [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+
+            ---
+
+            Made with ❤️ by [Solede SA](https://solede.com)
+          draft: false
+          prerelease: false
+          generate_release_notes: true  # Genera note automatiche da commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

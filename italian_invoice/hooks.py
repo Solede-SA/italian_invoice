@@ -3,7 +3,7 @@ app_title = "Italian Invoice"
 app_publisher = "Solede SA"
 app_description = "Gestione della Fatturazione Elettronica in Italia"
 app_email = "info@solede.com"
-app_license = "mit"
+app_license = "AGPLv3"
 # required_apps = []
 
 # Includes in <head>

@@ -1,0 +1,61 @@
+name: Lint and Format
+
+on:
+  pull_request:
+    branches: [ develop, main ]
+  push:
+    branches: [ develop, main ]
+
+jobs:
+  lint-python:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Lint with ruff
+        run: |
+          # Check for errors
+          ruff check solede_openbanking/
+
+      - name: Format check with ruff
+        run: |
+          # Check formatting
+          ruff format --check solede_openbanking/
+
+  lint-javascript:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install -g eslint prettier
+
+      - name: Lint JavaScript
+        run: |
+          # Lint JS files
+          eslint solede_openbanking/public/js/*.js || true
+
+      - name: Check formatting
+        run: |
+          # Check prettier formatting
+          prettier --check "solede_openbanking/public/js/*.js" || true
