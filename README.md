@@ -260,6 +260,16 @@ git push origin feature/AmazingFeature
 - [Frappe Framework](https://frappeframework.com)
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Guida completa per sviluppatori
 
+## 🔒 Privacy
+
+Leggi la nostra [Privacy Policy](PRIVACY.md) per informazioni su come l'app gestisce i tuoi dati.
+
+**In breve:**
+- ✅ Tutti i dati rimangono nel tuo database ERPNext
+- ✅ Nessun dato inviato a Solede SA
+- ✅ Integrazioni esterne solo se configurate da te
+- ✅ Codice open source e verificabile
+
 ## 📄 License
 
 GNU Affero General Public License v3.0 - vedi [LICENSE](LICENSE)
