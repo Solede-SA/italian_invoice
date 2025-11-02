@@ -22,8 +22,8 @@ App Frappe/ERPNext per la gestione della **Fatturazione Elettronica Italiana** c
 ## 📦 Installazione
 
 ```bash
-# Ottieni l'app
-bench get-app italian_invoice
+# Ottieni l'app da GitHub
+bench get-app https://github.com/Solede-SA/italian_invoice.git
 
 # Installa nel sito
 bench --site [nome-sito] install-app italian_invoice
