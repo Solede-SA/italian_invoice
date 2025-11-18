@@ -56,7 +56,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
           body: |
-            # ${{ steps.tag.outputs.tag }} - Solede OpenBanking
+            # ${{ steps.tag.outputs.tag }} - Italian Invoice
 
             ${{ steps.changelog.outputs.notes }}
 
@@ -66,8 +66,8 @@ jobs:
 
             ```bash
             cd frappe-bench
-            bench get-app https://github.com/Solede-SA/solede_openbanking.git
-            bench --site your-site.local install-app solede_openbanking
+            bench get-app https://github.com/Solede-SA/italian_invoice.git
+            bench --site your-site.local install-app italian_invoice
             bench --site your-site.local migrate
             bench restart
             ```
