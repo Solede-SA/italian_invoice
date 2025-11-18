@@ -151,8 +151,8 @@
             {% for item in doc.e_invoice_items %}
             <DettaglioLinee>
                 <NumeroLinea>{{ item.idx }}</NumeroLinea>
-                
-                    {%- set rdm = frappe.db.get_value("Item", item.item_code, "custom_rdm") -%}
+
+                    {%- set rdm = frappe.db.get_value("Item", item.item_code, "custom_rdm", ignore_missing_column=True) -%}
                     {%- if rdm %}
                     <CodiceArticolo>
                         <CodiceTipo>DM1</CodiceTipo>
