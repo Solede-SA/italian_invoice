@@ -68,7 +68,7 @@ app_license = "AGPLv3"
 # ------------
 
 # before_install = "italian_invoice.install.before_install"
-# after_install = "italian_invoice.install.after_install"
+after_install = "italian_invoice.install.after_install"
 
 # Uninstallation
 # ------------

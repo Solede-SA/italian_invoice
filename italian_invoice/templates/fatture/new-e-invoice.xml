@@ -44,19 +44,17 @@
             <Sede>
                 {{ macros.render_address(doc.cedente_prestatore.address) }}
             </Sede>
-            {% if doc.cedente_prestatore.doctype == "Company" %}
+            {% if doc.cedente_prestatore.doctype == "Company" and doc.company_data.registration_data.registrar_office_province and doc.company_data.registration_data.registration_number %}
                 <IscrizioneREA>
                     <Ufficio>{{ doc.company_data.registration_data.registrar_office_province }}</Ufficio>
                     <NumeroREA>{{ doc.company_data.registration_data.registration_number }}</NumeroREA>
-                    {% if doc.company_data.registration_data.share_capital_amount %}
+                    {% if doc.company_data.registration_data.share_capital_amount and doc.company_data.registration_data.share_capital_amount > 0 %}
                         <CapitaleSociale>{{ macros.format_float(doc.company_data.registration_data.share_capital_amount) }}</CapitaleSociale>
                     {% endif %}
                     {% if doc.company_data.registration_data.no_of_members %}
                         <SocioUnico>{{ doc.company_data.registration_data.no_of_members.split("-")[0] }}</SocioUnico>
                     {% endif %}
-                    {% if doc.company_data.registration_data.liquidation_state %}
-                        <StatoLiquidazione>{{ doc.company_data.registration_data.liquidation_state.split("-")[0] }}</StatoLiquidazione>
-                    {% endif %}
+                    <StatoLiquidazione>{% if doc.company_data.registration_data.liquidation_state %}{{ doc.company_data.registration_data.liquidation_state.split("-")[0] }}{% else %}LN{% endif %}</StatoLiquidazione>
                 </IscrizioneREA>
             {% endif %}
             {% if doc.cedente_prestatore.contact.email %}
@@ -152,11 +150,10 @@
             <DettaglioLinee>
                 <NumeroLinea>{{ item.idx }}</NumeroLinea>
 
-                    {%- set rdm = frappe.db.get_value("Item", item.item_code, "custom_rdm", ignore_missing_column=True) -%}
-                    {%- if rdm %}
+                    {%- if item.get("custom_rdm") %}
                     <CodiceArticolo>
                         <CodiceTipo>DM1</CodiceTipo>
-                        <CodiceValore>{{ rdm }}</CodiceValore>
+                        <CodiceValore>{{ item.custom_rdm }}</CodiceValore>
                     </CodiceArticolo>
                     {%- endif %}
                 <CodiceArticolo>

@@ -427,6 +427,13 @@ def get_invoice_data(doc):
     cedente_prestatore = get_cedente_prestatore(doc)
     e_invoice_items = [item for item in doc.items]
 
+    # Add optional cbmedical fields if they exist
+    for item in e_invoice_items:
+        try:
+            item.custom_rdm = frappe.db.get_value("Item", item.item_code, "custom_rdm")
+        except Exception:
+            item.custom_rdm = None
+
     tipo_di_documento = frappe.get_doc(
         "Tipologia di documento e-Invoice", doc.custom_tipo_di_documento
     )
