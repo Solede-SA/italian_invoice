@@ -1,14 +1,18 @@
 {
-  "custom_fields": [
-    {
-      "dt": "Delivery Note",
-      "label": "Billing Gap",
-      "fieldname": "custom_billing_gap",
-      "fieldtype": "Currency",
-      "insert_after": "per_billed",
-      "read_only": 1,
-      "description": "Difference between total amount and billed amount",
-      "precision": 2
-    }
-  ]
+ "doctype": "Delivery Note",
+ "custom_fields": [
+  {
+   "dt": "Delivery Note",
+   "label": "Billing Gap",
+   "fieldname": "custom_billing_gap",
+   "fieldtype": "Currency",
+   "insert_after": "per_billed",
+   "read_only": 1,
+   "description": "Difference between total amount and billed amount",
+   "precision": 2
+  }
+ ],
+ "custom_perms": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
 }
