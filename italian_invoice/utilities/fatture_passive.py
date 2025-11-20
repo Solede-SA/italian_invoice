@@ -1,359 +1,343 @@
-# -*- coding: utf-8 -*-
 """
 Gestione fatture passive (fornitori) per Italian Invoice
 Indipendente dal provider SDI utilizzato
 """
 
-import frappe
 import json
 from difflib import SequenceMatcher
 
+import frappe
+
 
 def get_or_create_supplier(supplier_vat_id, invoice_data):
-    """
-    Controlla se esiste un fornitore con la partita IVA data, altrimenti lo crea
+	"""
+	Controlla se esiste un fornitore con la partita IVA data, altrimenti lo crea
 
-    Args:
-        supplier_vat_id: Partita IVA del fornitore
-        invoice_data: Dati fattura per recuperare info fornitore
+	Args:
+	    supplier_vat_id: Partita IVA del fornitore
+	    invoice_data: Dati fattura per recuperare info fornitore
 
-    Returns:
-        dict: Dati del fornitore (esistente o appena creato)
-    """
-    try:
-        # Cerca fornitore esistente
-        supplier = frappe.db.exists("Supplier", {"tax_id": supplier_vat_id})
+	Returns:
+	    dict: Dati del fornitore (esistente o appena creato)
+	"""
+	try:
+		# Cerca fornitore esistente
+		supplier = frappe.db.exists("Supplier", {"tax_id": supplier_vat_id})
 
-        if supplier:
-            # Ritorna i dati del fornitore esistente
-            supplier_doc = frappe.get_doc("Supplier", supplier)
-            return {
-                "success": True,
-                "supplier_name": supplier_doc.name,
-                "supplier_data": supplier_doc.as_dict(),
-                "is_new": False,
-            }
+		if supplier:
+			# Ritorna i dati del fornitore esistente
+			supplier_doc = frappe.get_doc("Supplier", supplier)
+			return {
+				"success": True,
+				"supplier_name": supplier_doc.name,
+				"supplier_data": supplier_doc.as_dict(),
+				"is_new": False,
+			}
 
-        # Estrai dati fornitore dal JSON/XML
-        supplier_data = extract_supplier_data(invoice_data)
+		# Estrai dati fornitore dal JSON/XML
+		supplier_data = extract_supplier_data(invoice_data)
 
-        # Crea nuovo fornitore
-        new_supplier = create_supplier(supplier_data, invoice_data.get("company"))
+		# Crea nuovo fornitore
+		new_supplier = create_supplier(supplier_data, invoice_data.get("company"))
 
-        supplier_doc = frappe.get_doc("Supplier", new_supplier)
-        return {
-            "success": True,
-            "supplier_name": supplier_doc.name,
-            "supplier_data": supplier_doc.as_dict(),
-            "is_new": True,
-        }
+		supplier_doc = frappe.get_doc("Supplier", new_supplier)
+		return {
+			"success": True,
+			"supplier_name": supplier_doc.name,
+			"supplier_data": supplier_doc.as_dict(),
+			"is_new": True,
+		}
 
-    except Exception as e:
-        frappe.log_error(
-            f"Errore in get_or_create_supplier: {str(e)}", "Italian Invoice Passive"
-        )
-        return {"success": False, "error": str(e)}
+	except Exception as e:
+		frappe.log_error(f"Errore in get_or_create_supplier: {str(e)}", "Italian Invoice Passive")
+		return {"success": False, "error": str(e)}
 
 
 def extract_supplier_data(invoice_data):
-    """
-    Estrae dati fornitore dal formato JSON/XML della fattura
-    Usa la funzione centralizzata per gestire diversi formati
-    """
-    from italian_invoice.utilities.fatture import get_cedente_prestatore_from_json
+	"""
+	Estrae dati fornitore dal formato JSON/XML della fattura
+	Usa la funzione centralizzata per gestire diversi formati
+	"""
+	from italian_invoice.utilities.fatture import get_cedente_prestatore_from_json
 
-    return get_cedente_prestatore_from_json(invoice_data)
+	return get_cedente_prestatore_from_json(invoice_data)
 
 
 def create_supplier(supplier_data, company):
-    """
-    Crea un nuovo fornitore
+	"""
+	Crea un nuovo fornitore
 
-    Args:
-        supplier_data: Dizionario con i dati del fornitore
-        company: Nome della company
+	Args:
+	    supplier_data: Dizionario con i dati del fornitore
+	    company: Nome della company
 
-    Returns:
-        Il nome del documento del fornitore creato
-    """
-    supplier = frappe.get_doc(
-        {
-            "doctype": "Supplier",
-            "supplier_name": supplier_data["dati_anagrafici"]["anagrafica"].get(
-                "denominazione",
-                supplier_data["dati_anagrafici"]["anagrafica"].get("nome", ""),
-            ),
-            "tax_id": supplier_data["dati_anagrafici"]["id_fiscale_iva"]["id_codice"],
-            "supplier_group": get_default_supplier_group(),
-            "supplier_type": "Company",
-            "tax_country": supplier_data["dati_anagrafici"]["id_fiscale_iva"][
-                "id_paese"
-            ],
-            "is_frozen": 0,
-            "status": "Passive",
-        }
-    )
+	Returns:
+	    Il nome del documento del fornitore creato
+	"""
+	supplier = frappe.get_doc(
+		{
+			"doctype": "Supplier",
+			"supplier_name": supplier_data["dati_anagrafici"]["anagrafica"].get(
+				"denominazione",
+				supplier_data["dati_anagrafici"]["anagrafica"].get("nome", ""),
+			),
+			"tax_id": supplier_data["dati_anagrafici"]["id_fiscale_iva"]["id_codice"],
+			"supplier_group": get_default_supplier_group(),
+			"supplier_type": "Company",
+			"tax_country": supplier_data["dati_anagrafici"]["id_fiscale_iva"]["id_paese"],
+			"is_frozen": 0,
+			"status": "Passive",
+		}
+	)
 
-    # Aggiungi indirizzo se presente
-    if "sede" in supplier_data:
-        sede = supplier_data["sede"]
-        supplier.address_line1 = sede.get("indirizzo", "")
-        supplier.address_line2 = sede.get("numero_civico", "")
-        supplier.city = sede.get("comune", "")
-        supplier.state = sede.get("provincia", "")
-        supplier.pincode = sede.get("cap", "")
-        supplier.country = get_country_name(sede.get("nazione", "IT"))
+	# Aggiungi indirizzo se presente
+	if "sede" in supplier_data:
+		sede = supplier_data["sede"]
+		supplier.address_line1 = sede.get("indirizzo", "")
+		supplier.address_line2 = sede.get("numero_civico", "")
+		supplier.city = sede.get("comune", "")
+		supplier.state = sede.get("provincia", "")
+		supplier.pincode = sede.get("cap", "")
+		supplier.country = get_country_name(sede.get("nazione", "IT"))
 
-    # Gestione contatti opzionali
-    if supplier_data.get("contatti"):
-        contatti = supplier_data["contatti"]
-        if contatti.get("telefono"):
-            supplier.phone = contatti["telefono"]
-        if contatti.get("fax"):
-            supplier.fax = contatti["fax"]
-        if contatti.get("email"):
-            supplier.email_id = contatti["email"]
+	# Gestione contatti opzionali
+	if supplier_data.get("contatti"):
+		contatti = supplier_data["contatti"]
+		if contatti.get("telefono"):
+			supplier.phone = contatti["telefono"]
+		if contatti.get("fax"):
+			supplier.fax = contatti["fax"]
+		if contatti.get("email"):
+			supplier.email_id = contatti["email"]
 
-    # Se ha codice fiscale persona fisica
-    if supplier_data["dati_anagrafici"].get("codice_fiscale"):
-        cf = supplier_data["dati_anagrafici"]["codice_fiscale"]
-        if len(cf) != 11:  # Non è un CF temporaneo
-            supplier.supplier_type = "Individual"
-            supplier.fiscal_code = cf
+	# Se ha codice fiscale persona fisica
+	if supplier_data["dati_anagrafici"].get("codice_fiscale"):
+		cf = supplier_data["dati_anagrafici"]["codice_fiscale"]
+		if len(cf) != 11:  # Non è un CF temporaneo
+			supplier.supplier_type = "Individual"
+			supplier.fiscal_code = cf
 
-    supplier.insert()
-    supplier.save()
-    return supplier.name
+	supplier.insert()
+	supplier.save()
+	return supplier.name
 
 
 @frappe.whitelist()
 def find_matching_items(supplier_name, invoice_lines):
-    """
-    Cerca item matching per le righe della fattura basandosi sulla descrizione
+	"""
+	Cerca item matching per le righe della fattura basandosi sulla descrizione
 
-    Args:
-        supplier_name: Nome del fornitore
-        invoice_lines: Lista di righe fattura con numero_linea e descrizione
+	Args:
+	    supplier_name: Nome del fornitore
+	    invoice_lines: Lista di righe fattura con numero_linea e descrizione
 
-    Returns:
-        dict: {numero_linea: {"item_code": "...", "expense_account": "..."}}
-    """
-    if isinstance(invoice_lines, str):
-        invoice_lines = json.loads(invoice_lines)
+	Returns:
+	    dict: {numero_linea: {"item_code": "...", "expense_account": "..."}}
+	"""
+	if isinstance(invoice_lines, str):
+		invoice_lines = json.loads(invoice_lines)
 
-    matches = {}
+	matches = {}
 
-    # Ottieni tutti gli item del fornitore
-    items = frappe.get_all(
-        "Item Default",
-        filters={"default_supplier": supplier_name},
-        fields=["parent as item_code"],
-    )
+	# Ottieni tutti gli item del fornitore
+	items = frappe.get_all(
+		"Item Default",
+		filters={"default_supplier": supplier_name},
+		fields=["parent as item_code"],
+	)
 
-    if not items:
-        return matches
+	if not items:
+		return matches
 
-    item_codes = [item["item_code"] for item in items]
+	item_codes = [item["item_code"] for item in items]
 
-    # Ottieni dettagli degli item
-    items_details = frappe.get_all(
-        "Item",
-        filters={"name": ["in", item_codes]},
-        fields=["name", "item_name", "description"],
-    )
+	# Ottieni dettagli degli item
+	items_details = frappe.get_all(
+		"Item",
+		filters={"name": ["in", item_codes]},
+		fields=["name", "item_name", "description"],
+	)
 
-    for line in invoice_lines:
-        line_desc = (line.get("descrizione") or "").strip().lower()
-        if not line_desc:
-            continue
+	for line in invoice_lines:
+		line_desc = (line.get("descrizione") or "").strip().lower()
+		if not line_desc:
+			continue
 
-        best_match = None
-        best_ratio = 0.0
+		best_match = None
+		best_ratio = 0.0
 
-        for item in items_details:
-            # Confronta con item_name
-            item_name = (item.get("item_name") or "").strip().lower()
-            if item_name:
-                ratio = SequenceMatcher(None, line_desc, item_name).ratio()
-                if ratio > best_ratio and ratio > 0.7:  # Soglia 70% similarità
-                    best_ratio = ratio
-                    best_match = item["name"]
+		for item in items_details:
+			# Confronta con item_name
+			item_name = (item.get("item_name") or "").strip().lower()
+			if item_name:
+				ratio = SequenceMatcher(None, line_desc, item_name).ratio()
+				if ratio > best_ratio and ratio > 0.7:  # Soglia 70% similarità
+					best_ratio = ratio
+					best_match = item["name"]
 
-            # Confronta anche con description se presente
-            item_desc = (item.get("description") or "").strip().lower()
-            if item_desc:
-                ratio = SequenceMatcher(None, line_desc, item_desc).ratio()
-                if ratio > best_ratio and ratio > 0.7:
-                    best_ratio = ratio
-                    best_match = item["name"]
+			# Confronta anche con description se presente
+			item_desc = (item.get("description") or "").strip().lower()
+			if item_desc:
+				ratio = SequenceMatcher(None, line_desc, item_desc).ratio()
+				if ratio > best_ratio and ratio > 0.7:
+					best_ratio = ratio
+					best_match = item["name"]
 
-            # Exact match ha priorità
-            if line_desc == item_name or line_desc == item_desc:
-                best_match = item["name"]
-                break
+			# Exact match ha priorità
+			if line_desc == item_name or line_desc == item_desc:
+				best_match = item["name"]
+				break
 
-        if best_match:
-            # Recupera anche il conto di costo
-            expense_account = frappe.db.get_value(
-                "Item Default",
-                {"parent": best_match, "default_supplier": supplier_name},
-                "expense_account",
-            )
+		if best_match:
+			# Recupera anche il conto di costo
+			expense_account = frappe.db.get_value(
+				"Item Default",
+				{"parent": best_match, "default_supplier": supplier_name},
+				"expense_account",
+			)
 
-            matches[line.get("numero_linea")] = {
-                "item_code": best_match,
-                "expense_account": expense_account,
-            }
+			matches[line.get("numero_linea")] = {
+				"item_code": best_match,
+				"expense_account": expense_account,
+			}
 
-    return matches
+	return matches
 
 
 @frappe.whitelist()
-def process_supplier_invoice(
-    invoice_data, fattura_fornitori_sdi=None, item_mappings=None
-):
-    """
-    Processa una fattura fornitore e crea una Purchase Invoice
+def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mappings=None):
+	"""
+	Processa una fattura fornitore e crea una Purchase Invoice
 
-    Args:
-        invoice_data: JSON string o dict con dati fattura
-        fattura_fornitori_sdi: Nome doc Fattura Fornitori SDI (opzionale)
-        item_mappings: Mapping articoli personalizzato (opzionale)
+	Args:
+	    invoice_data: JSON string o dict con dati fattura
+	    fattura_fornitori_sdi: Nome doc Fattura Fornitori SDI (opzionale)
+	    item_mappings: Mapping articoli personalizzato (opzionale)
 
-    Returns:
-        Nome della Purchase Invoice creata
-    """
-    try:
-        frappe.db.begin()
+	Returns:
+	    Nome della Purchase Invoice creata
+	"""
+	try:
+		frappe.db.begin()
 
-        # Parse dati se necessario
-        if isinstance(invoice_data, str):
-            invoice_data = json.loads(invoice_data)
+		# Parse dati se necessario
+		if isinstance(invoice_data, str):
+			invoice_data = json.loads(invoice_data)
 
-        if item_mappings and isinstance(item_mappings, str):
-            item_mappings = json.loads(item_mappings)
+		if item_mappings and isinstance(item_mappings, str):
+			item_mappings = json.loads(item_mappings)
 
-        # Estrai dati fattura
-        from italian_invoice.utilities.fatture import (
-            get_invoice_payload,
-            get_supplier_vat_from_json,
-        )
+		# Estrai dati fattura
+		from italian_invoice.utilities.fatture import (
+			get_invoice_payload,
+			get_supplier_vat_from_json,
+		)
 
-        payload = get_invoice_payload(invoice_data)
+		payload = get_invoice_payload(invoice_data)
 
-        # Ottieni o crea fornitore
-        supplier_vat = get_supplier_vat_from_json(payload)
-        supplier_result = get_or_create_supplier(supplier_vat, invoice_data)
+		# Ottieni o crea fornitore
+		supplier_vat = get_supplier_vat_from_json(payload)
+		supplier_result = get_or_create_supplier(supplier_vat, invoice_data)
 
-        if not supplier_result["success"]:
-            frappe.db.rollback()
-            frappe.throw(f"Errore fornitore: {supplier_result['error']}")
+		if not supplier_result["success"]:
+			frappe.db.rollback()
+			frappe.throw(f"Errore fornitore: {supplier_result['error']}")
 
-        supplier = supplier_result["supplier_name"]
+		supplier = supplier_result["supplier_name"]
 
-        # Determina company
-        if fattura_fornitori_sdi:
-            fattura_sdi_doc = frappe.get_doc(
-                "Fattura Fornitori SDI", fattura_fornitori_sdi
-            )
-            company = fattura_sdi_doc.company
-        else:
-            company = invoice_data.get(
-                "company", frappe.defaults.get_user_default("Company")
-            )
+		# Determina company
+		if fattura_fornitori_sdi:
+			fattura_sdi_doc = frappe.get_doc("Fattura Fornitori SDI", fattura_fornitori_sdi)
+			company = fattura_sdi_doc.company
+		else:
+			company = invoice_data.get("company", frappe.defaults.get_user_default("Company"))
 
-        # Estrai dati documento
-        doc_data = extract_document_data(payload)
+		# Estrai dati documento
+		doc_data = extract_document_data(payload)
 
-        # Estrai righe fattura
-        invoice_lines = extract_invoice_lines(payload)
+		# Estrai righe fattura
+		invoice_lines = extract_invoice_lines(payload)
 
-        # Verifica se è una nota di credito
-        tipo_documento = doc_data.get("tipo_documento")
-        is_return = is_credit_note(tipo_documento)
+		# Verifica se è una nota di credito
+		tipo_documento = doc_data.get("tipo_documento")
+		is_return = is_credit_note(tipo_documento)
 
-        # Crea Purchase Invoice
-        purchase_invoice = frappe.get_doc(
-            {
-                "doctype": "Purchase Invoice",
-                "supplier": supplier,
-                "posting_date": doc_data["data"],
-                "company": company,
-                "currency": doc_data.get("divisa", "EUR"),
-                "is_paid": 0,
-                "is_return": 1 if is_return else 0,
-                "status": "Draft",
-                "from_xml": 1,
-                "bill_no": doc_data["numero"],
-                "bill_date": doc_data["data"],
-                "items": prepare_invoice_items(
-                    invoice_lines, item_mappings, company, is_return
-                ),
-                "taxes": prepare_invoice_taxes(
-                    extract_tax_summary(payload), company, is_return
-                ),
-            }
-        )
+		# Crea Purchase Invoice
+		purchase_invoice = frappe.get_doc(
+			{
+				"doctype": "Purchase Invoice",
+				"supplier": supplier,
+				"posting_date": doc_data["data"],
+				"company": company,
+				"currency": doc_data.get("divisa", "EUR"),
+				"is_paid": 0,
+				"is_return": 1 if is_return else 0,
+				"status": "Draft",
+				"from_xml": 1,
+				"bill_no": doc_data["numero"],
+				"bill_date": doc_data["data"],
+				"items": prepare_invoice_items(invoice_lines, item_mappings, company, is_return),
+				"taxes": prepare_invoice_taxes(extract_tax_summary(payload), company, is_return),
+			}
+		)
 
-        # Aggiungi riferimento file se presente
-        if invoice_data.get("data", {}).get("invoice", {}).get("file_id"):
-            purchase_invoice.scan_field = invoice_data["data"]["invoice"]["file_id"]
+		# Aggiungi riferimento file se presente
+		if invoice_data.get("data", {}).get("invoice", {}).get("file_id"):
+			purchase_invoice.scan_field = invoice_data["data"]["invoice"]["file_id"]
 
-        purchase_invoice.insert()
-        purchase_invoice.save()
+		purchase_invoice.insert()
+		purchase_invoice.save()
 
-        # Aggiorna Fattura Fornitori SDI se presente
-        if fattura_fornitori_sdi:
-            fattura_sdi_doc.fattura = purchase_invoice.name
-            fattura_sdi_doc.stato = "Importata"
-            fattura_sdi_doc.save()
+		# Aggiorna Fattura Fornitori SDI se presente
+		if fattura_fornitori_sdi:
+			fattura_sdi_doc.fattura = purchase_invoice.name
+			fattura_sdi_doc.stato = "Importata"
+			fattura_sdi_doc.save()
 
-        frappe.db.commit()
-        return purchase_invoice.name
+		frappe.db.commit()
+		return purchase_invoice.name
 
-    except Exception as e:
-        frappe.db.rollback()
-        frappe.log_error(f"Errore importazione: {str(e)}", "Italian Invoice Passive")
-        frappe.throw(f"Errore importazione fattura: {str(e)}")
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(f"Errore importazione: {str(e)}", "Italian Invoice Passive")
+		frappe.throw(f"Errore importazione fattura: {str(e)}")
 
 
 def is_credit_note(tipo_documento):
-    """Verifica se il tipo documento è una nota di credito"""
-    return tipo_documento in ["TD04", "TD05", "TD08", "TD09"]
+	"""Verifica se il tipo documento è una nota di credito"""
+	return tipo_documento in ["TD04", "TD05", "TD08", "TD09"]
 
 
 def invert_sign_for_credit_note(value, is_return):
-    """Inverte il segno di un valore se è una nota di credito"""
-    if not is_return:
-        return value
-    return -abs(float(value)) if value else 0
+	"""Inverte il segno di un valore se è una nota di credito"""
+	if not is_return:
+		return value
+	return -abs(float(value)) if value else 0
 
 
 @frappe.whitelist()
 def get_open_purchase_documents_summary(supplier_vat):
-    """
-    Recupera sommario di PO/PR aperti per un fornitore (per alert nel form)
+	"""
+	Recupera sommario di PO/PR aperti per un fornitore (per alert nel form)
 
-    Args:
-        supplier_vat: Partita IVA fornitore
+	Args:
+	    supplier_vat: Partita IVA fornitore
 
-    Returns:
-        dict: {"purchase_orders": [...], "purchase_receipts": [...]}
-    """
-    result = {"purchase_orders": [], "purchase_receipts": []}
+	Returns:
+	    dict: {"purchase_orders": [...], "purchase_receipts": [...]}
+	"""
+	result = {"purchase_orders": [], "purchase_receipts": []}
 
-    # Trova fornitore dalla partita IVA
-    supplier_list = frappe.get_list(
-        "Supplier", filters={"tax_id": supplier_vat}, fields=["name"]
-    )
-    if not supplier_list:
-        return result
+	# Trova fornitore dalla partita IVA
+	supplier_list = frappe.get_list("Supplier", filters={"tax_id": supplier_vat}, fields=["name"])
+	if not supplier_list:
+		return result
 
-    supplier = supplier_list[0]["name"]
+	supplier = supplier_list[0]["name"]
 
-    # Purchase Orders aperti
-    pos = frappe.db.sql(
-        """
+	# Purchase Orders aperti
+	pos = frappe.db.sql(
+		"""
         SELECT DISTINCT
             parent.name,
             parent.transaction_date,
@@ -367,14 +351,14 @@ def get_open_purchase_documents_summary(supplier_vat):
         ORDER BY parent.transaction_date DESC
         LIMIT 10
     """,
-        {"supplier": supplier},
-        as_dict=True,
-    )
-    result["purchase_orders"] = pos
+		{"supplier": supplier},
+		as_dict=True,
+	)
+	result["purchase_orders"] = pos
 
-    # Purchase Receipts aperti
-    prs = frappe.db.sql(
-        """
+	# Purchase Receipts aperti
+	prs = frappe.db.sql(
+		"""
         SELECT DISTINCT
             parent.name,
             parent.posting_date,
@@ -388,537 +372,519 @@ def get_open_purchase_documents_summary(supplier_vat):
         ORDER BY parent.posting_date DESC
         LIMIT 10
     """,
-        {"supplier": supplier},
-        as_dict=True,
-    )
-    result["purchase_receipts"] = prs
+		{"supplier": supplier},
+		as_dict=True,
+	)
+	result["purchase_receipts"] = prs
 
-    return result
+	return result
 
 
 @frappe.whitelist()
 def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sdi_name):
-    """
-    Crea una Purchase Invoice da un Purchase Order o Purchase Receipt
+	"""
+	Crea una Purchase Invoice da un Purchase Order o Purchase Receipt
 
-    Args:
-        doc_name: Nome del PO/PR
-        doctype: "Purchase Order" o "Purchase Receipt"
-        bill_no: Numero fattura da impostare
-        fattura_sdi_name: Nome della Fattura Fornitori SDI
+	Args:
+	    doc_name: Nome del PO/PR
+	    doctype: "Purchase Order" o "Purchase Receipt"
+	    bill_no: Numero fattura da impostare
+	    fattura_sdi_name: Nome della Fattura Fornitori SDI
 
-    Returns:
-        Nome della Purchase Invoice creata
-    """
-    if doctype == "Purchase Order":
-        from erpnext.buying.doctype.purchase_order.purchase_order import (
-            make_purchase_invoice,
-        )
+	Returns:
+	    Nome della Purchase Invoice creata
+	"""
+	if doctype == "Purchase Order":
+		from erpnext.buying.doctype.purchase_order.purchase_order import (
+			make_purchase_invoice,
+		)
 
-        pi = make_purchase_invoice(doc_name)
-    elif doctype == "Purchase Receipt":
-        from erpnext.stock.doctype.purchase_receipt.purchase_receipt import (
-            make_purchase_invoice,
-        )
+		pi = make_purchase_invoice(doc_name)
+	elif doctype == "Purchase Receipt":
+		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import (
+			make_purchase_invoice,
+		)
 
-        pi = make_purchase_invoice(doc_name)
-    else:
-        frappe.throw(f"Doctype non supportato: {doctype}")
+		pi = make_purchase_invoice(doc_name)
+	else:
+		frappe.throw(f"Doctype non supportato: {doctype}")
 
-    # Imposta bill_no
-    pi.bill_no = bill_no
+	# Imposta bill_no
+	pi.bill_no = bill_no
 
-    # Estrai data fattura dalla Fattura Fornitori SDI
-    fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
-    bill_date = _get_bill_date_from_fattura_sdi(fattura_sdi)
-    if bill_date:
-        pi.bill_date = bill_date
+	# Estrai data fattura dalla Fattura Fornitori SDI
+	fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
+	bill_date = _get_bill_date_from_fattura_sdi(fattura_sdi)
+	if bill_date:
+		pi.bill_date = bill_date
 
-    # Salva (ma non submit)
-    pi.insert()
-    frappe.db.commit()
+	# Salva (ma non submit)
+	pi.insert()
+	frappe.db.commit()
 
-    return pi.name
+	return pi.name
 
 
 def _get_bill_date_from_fattura_sdi(fattura_sdi):
-    """Estrae la data fattura dai dati JSON della Fattura Fornitori SDI"""
-    from italian_invoice.utilities.fatture import get_fattura_body
+	"""Estrae la data fattura dai dati JSON della Fattura Fornitori SDI"""
+	from italian_invoice.utilities.fatture import get_fattura_body
 
-    body = get_fattura_body(fattura_sdi.dati_fattura)
-    if not body:
-        return None
+	body = get_fattura_body(fattura_sdi.dati_fattura)
+	if not body:
+		return None
 
-    return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("data")
+	return body.get("dati_generali", {}).get("dati_generali_documento", {}).get("data")
 
 
 @frappe.whitelist()
 def prepare_purchase_document_for_invoice(doc_name, doctype, bill_no):
-    """
-    Popola bill_no in un PO/PR per prepararlo alla creazione della PI
+	"""
+	Popola bill_no in un PO/PR per prepararlo alla creazione della PI
 
-    Args:
-        doc_name: Nome del PO/PR
-        doctype: "Purchase Order" o "Purchase Receipt"
-        bill_no: Numero fattura da settare
+	Args:
+	    doc_name: Nome del PO/PR
+	    doctype: "Purchase Order" o "Purchase Receipt"
+	    bill_no: Numero fattura da settare
 
-    Returns:
-        dict: URL del documento
-    """
-    if doctype not in ["Purchase Order", "Purchase Receipt"]:
-        frappe.throw("Doctype non valido")
+	Returns:
+	    dict: URL del documento
+	"""
+	if doctype not in ["Purchase Order", "Purchase Receipt"]:
+		frappe.throw("Doctype non valido")
 
-    # Il bill_no verrà copiato automaticamente quando si crea la PI dal PO/PR
-    # Non serve modificare il PO/PR qui, lo gestiamo nella creazione PI
+	# Il bill_no verrà copiato automaticamente quando si crea la PI dal PO/PR
+	# Non serve modificare il PO/PR qui, lo gestiamo nella creazione PI
 
-    return {
-        "success": True,
-        "url": f"/app/{doctype.lower().replace(' ', '-')}/{doc_name}",
-    }
+	return {
+		"success": True,
+		"url": f"/app/{doctype.lower().replace(' ', '-')}/{doc_name}",
+	}
 
 
 def find_fattura_sdi_by_bill_no(bill_no, supplier=None):
-    """
-    Trova una Fattura Fornitori SDI dal numero fattura (DRY)
+	"""
+	Trova una Fattura Fornitori SDI dal numero fattura (DRY)
 
-    Args:
-        bill_no: Numero fattura
-        supplier: Partita IVA fornitore (opzionale)
+	Args:
+	    bill_no: Numero fattura
+	    supplier: Partita IVA fornitore (opzionale)
 
-    Returns:
-        Nome della Fattura Fornitori SDI o None
-    """
-    filters = {"dati_fattura": ["like", f'%"numero": "{bill_no}"%']}
-    if supplier:
-        filters["partita_iva_fornitore"] = supplier
+	Returns:
+	    Nome della Fattura Fornitori SDI o None
+	"""
+	filters = {"dati_fattura": ["like", f'%"numero": "{bill_no}"%']}
+	if supplier:
+		filters["partita_iva_fornitore"] = supplier
 
-    fatture = frappe.get_list(
-        "Fattura Fornitori SDI", filters=filters, fields=["name"], limit=1
-    )
+	fatture = frappe.get_list("Fattura Fornitori SDI", filters=filters, fields=["name"], limit=1)
 
-    return fatture[0]["name"] if fatture else None
+	return fatture[0]["name"] if fatture else None
 
 
 def link_purchase_invoice_to_fattura_sdi(purchase_invoice_name, fattura_sdi_name):
-    """
-    Collega una Purchase Invoice a una Fattura SDI (DRY)
+	"""
+	Collega una Purchase Invoice a una Fattura SDI (DRY)
 
-    Args:
-        purchase_invoice_name: Nome Purchase Invoice
-        fattura_sdi_name: Nome Fattura Fornitori SDI
-    """
-    fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
-    fattura_sdi.fattura = purchase_invoice_name
-    fattura_sdi.stato = "Importata"
-    fattura_sdi.save(ignore_permissions=True)
-    frappe.db.commit()
+	Args:
+	    purchase_invoice_name: Nome Purchase Invoice
+	    fattura_sdi_name: Nome Fattura Fornitori SDI
+	"""
+	fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
+	fattura_sdi.fattura = purchase_invoice_name
+	fattura_sdi.stato = "Importata"
+	fattura_sdi.save(ignore_permissions=True)
+	frappe.db.commit()
 
 
 def unlink_purchase_invoice_from_fattura_sdi(purchase_invoice_name):
-    """
-    Scollega una Purchase Invoice da Fattura SDI (DRY)
+	"""
+	Scollega una Purchase Invoice da Fattura SDI (DRY)
 
-    Args:
-        purchase_invoice_name: Nome Purchase Invoice
-    """
-    fatture = frappe.get_list(
-        "Fattura Fornitori SDI",
-        filters={"fattura": purchase_invoice_name},
-        fields=["name"],
-    )
+	Args:
+	    purchase_invoice_name: Nome Purchase Invoice
+	"""
+	fatture = frappe.get_list(
+		"Fattura Fornitori SDI",
+		filters={"fattura": purchase_invoice_name},
+		fields=["name"],
+	)
 
-    for fattura in fatture:
-        doc = frappe.get_doc("Fattura Fornitori SDI", fattura["name"])
-        doc.fattura = None
-        doc.stato = "Da importare"
-        doc.save(ignore_permissions=True)
+	for fattura in fatture:
+		doc = frappe.get_doc("Fattura Fornitori SDI", fattura["name"])
+		doc.fattura = None
+		doc.stato = "Da importare"
+		doc.save(ignore_permissions=True)
 
-    frappe.db.commit()
+	frappe.db.commit()
 
 
 def on_purchase_invoice_submit(doc, method):
-    """
-    Hook chiamato quando una Purchase Invoice viene submitted
-    Collega automaticamente alla Fattura Fornitori SDI se esiste
+	"""
+	Hook chiamato quando una Purchase Invoice viene submitted
+	Collega automaticamente alla Fattura Fornitori SDI se esiste
 
-    Args:
-        doc: Purchase Invoice document
-        method: Nome del metodo (on_submit)
-    """
-    if not doc.bill_no:
-        return
+	Args:
+	    doc: Purchase Invoice document
+	    method: Nome del metodo (on_submit)
+	"""
+	if not doc.bill_no:
+		return
 
-    # Ottieni partita IVA del fornitore
-    supplier_tax_id = frappe.db.get_value("Supplier", doc.supplier, "tax_id")
-    if not supplier_tax_id:
-        return
+	# Ottieni partita IVA del fornitore
+	supplier_tax_id = frappe.db.get_value("Supplier", doc.supplier, "tax_id")
+	if not supplier_tax_id:
+		return
 
-    # Cerca Fattura SDI con questo numero per questo fornitore
-    fattura_sdi_name = find_fattura_sdi_by_bill_no(doc.bill_no, supplier_tax_id)
+	# Cerca Fattura SDI con questo numero per questo fornitore
+	fattura_sdi_name = find_fattura_sdi_by_bill_no(doc.bill_no, supplier_tax_id)
 
-    if fattura_sdi_name:
-        link_purchase_invoice_to_fattura_sdi(doc.name, fattura_sdi_name)
-        frappe.msgprint(
-            f"Fattura collegata automaticamente a Fattura Fornitori SDI: {fattura_sdi_name}",
-            alert=True,
-            indicator="green",
-        )
+	if fattura_sdi_name:
+		link_purchase_invoice_to_fattura_sdi(doc.name, fattura_sdi_name)
+		frappe.msgprint(
+			f"Fattura collegata automaticamente a Fattura Fornitori SDI: {fattura_sdi_name}",
+			alert=True,
+			indicator="green",
+		)
 
 
 def on_purchase_invoice_cancel(doc, method):
-    """
-    Hook chiamato quando una Purchase Invoice viene cancellata
-    Scollega dalla Fattura Fornitori SDI
+	"""
+	Hook chiamato quando una Purchase Invoice viene cancellata
+	Scollega dalla Fattura Fornitori SDI
 
-    Args:
-        doc: Purchase Invoice document
-        method: Nome del metodo (on_cancel)
-    """
-    unlink_purchase_invoice_from_fattura_sdi(doc.name)
+	Args:
+	    doc: Purchase Invoice document
+	    method: Nome del metodo (on_cancel)
+	"""
+	unlink_purchase_invoice_from_fattura_sdi(doc.name)
 
 
 def extract_document_data(payload):
-    """Estrae dati generali documento"""
-    if "fattura_elettronica_body" in payload:
-        return payload["fattura_elettronica_body"][0]["dati_generali"][
-            "dati_generali_documento"
-        ]
-    elif "dati_generali" in payload:
-        return payload["dati_generali"]["dati_generali_documento"]
-    else:
-        return payload.get("dati_generali_documento", {})
+	"""Estrae dati generali documento"""
+	if "fattura_elettronica_body" in payload:
+		return payload["fattura_elettronica_body"][0]["dati_generali"]["dati_generali_documento"]
+	elif "dati_generali" in payload:
+		return payload["dati_generali"]["dati_generali_documento"]
+	else:
+		return payload.get("dati_generali_documento", {})
 
 
 def extract_invoice_lines(payload):
-    """Estrae righe fattura"""
-    if "fattura_elettronica_body" in payload:
-        return payload["fattura_elettronica_body"][0]["dati_beni_servizi"][
-            "dettaglio_linee"
-        ]
-    elif "dati_beni_servizi" in payload:
-        return payload["dati_beni_servizi"]["dettaglio_linee"]
-    else:
-        return payload.get("dettaglio_linee", [])
+	"""Estrae righe fattura"""
+	if "fattura_elettronica_body" in payload:
+		return payload["fattura_elettronica_body"][0]["dati_beni_servizi"]["dettaglio_linee"]
+	elif "dati_beni_servizi" in payload:
+		return payload["dati_beni_servizi"]["dettaglio_linee"]
+	else:
+		return payload.get("dettaglio_linee", [])
 
 
 def extract_tax_summary(payload):
-    """Estrae riepilogo IVA"""
-    if "fattura_elettronica_body" in payload:
-        return payload["fattura_elettronica_body"][0]["dati_beni_servizi"][
-            "dati_riepilogo"
-        ]
-    elif "dati_beni_servizi" in payload:
-        return payload["dati_beni_servizi"]["dati_riepilogo"]
-    else:
-        return payload.get("dati_riepilogo", [])
+	"""Estrae riepilogo IVA"""
+	if "fattura_elettronica_body" in payload:
+		return payload["fattura_elettronica_body"][0]["dati_beni_servizi"]["dati_riepilogo"]
+	elif "dati_beni_servizi" in payload:
+		return payload["dati_beni_servizi"]["dati_riepilogo"]
+	else:
+		return payload.get("dati_riepilogo", [])
 
 
 def calculate_total_discount(invoice_lines):
-    """
-    Calcola lo sconto totale dalle righe con importo negativo
+	"""
+	Calcola lo sconto totale dalle righe con importo negativo
 
-    Args:
-        invoice_lines: Lista righe fattura
+	Args:
+	    invoice_lines: Lista righe fattura
 
-    Returns:
-        float: Totale sconti (valore positivo)
-    """
-    total_discount = 0.0
+	Returns:
+	    float: Totale sconti (valore positivo)
+	"""
+	total_discount = 0.0
 
-    for line in invoice_lines:
-        try:
-            prezzo_totale = float(line.get("prezzo_totale", 0))
-            if prezzo_totale < 0:
-                total_discount += abs(prezzo_totale)
-        except (ValueError, TypeError):
-            continue
+	for line in invoice_lines:
+		try:
+			prezzo_totale = float(line.get("prezzo_totale", 0))
+			if prezzo_totale < 0:
+				total_discount += abs(prezzo_totale)
+		except (ValueError, TypeError):
+			continue
 
-    return total_discount
+	return total_discount
 
 
-def prepare_invoice_items(
-    invoice_lines, item_mappings=None, company=None, is_return=False
-):
-    """
-    Prepara le righe della fattura di acquisto
+def prepare_invoice_items(invoice_lines, item_mappings=None, company=None, is_return=False):
+	"""
+	Prepara le righe della fattura di acquisto
 
-    Args:
-        invoice_lines: Lista di righe della fattura
-        item_mappings: Mapping personalizzato articoli
-        company: Nome della società
-        is_return: True se è una nota di credito (inverte i segni)
+	Args:
+	    invoice_lines: Lista di righe della fattura
+	    item_mappings: Mapping personalizzato articoli
+	    company: Nome della società
+	    is_return: True se è una nota di credito (inverte i segni)
 
-    Returns:
-        Lista di dizionari per le righe Purchase Invoice
-    """
-    items = []
+	Returns:
+	    Lista di dizionari per le righe Purchase Invoice
+	"""
+	items = []
 
-    for line in invoice_lines:
-        # Verifica validità riga
-        if not is_valid_invoice_line(line):
-            continue
+	for line in invoice_lines:
+		# Verifica validità riga
+		if not is_valid_invoice_line(line):
+			continue
 
-        # Calcola quantità
-        quantity = get_line_quantity(line)
-        rate = float(line.get("prezzo_unitario", 0))
+		# Calcola quantità
+		quantity = get_line_quantity(line)
+		rate = float(line.get("prezzo_unitario", 0))
 
-        # Per note di credito, inverti il segno della quantità
-        quantity = invert_sign_for_credit_note(quantity, is_return)
-        if is_return:
-            rate = abs(rate)
+		# Per note di credito, inverti il segno della quantità
+		quantity = invert_sign_for_credit_note(quantity, is_return)
+		if is_return:
+			rate = abs(rate)
 
-        if item_mappings and str(line.get("numero_linea")) in item_mappings:
-            # Usa mapping personalizzato
-            mapping = item_mappings[str(line["numero_linea"])]
-            uom = frappe.db.get_value("Item", mapping["item_code"], "stock_uom") or "Nr"
+		if item_mappings and str(line.get("numero_linea")) in item_mappings:
+			# Usa mapping personalizzato
+			mapping = item_mappings[str(line["numero_linea"])]
+			uom = frappe.db.get_value("Item", mapping["item_code"], "stock_uom") or "Nr"
 
-            item_dict = {
-                "item_code": mapping["item_code"],
-                "description": mapping.get("description", line.get("descrizione", "")),
-                "qty": quantity,
-                "rate": rate,
-                "expense_account": mapping.get("account"),
-                "uom": uom,
-                "price_list_rate": rate,
-                "tax_rate": line.get("aliquota_iva", 0),
-                "tax_nature": line.get("natura"),
-            }
+			item_dict = {
+				"item_code": mapping["item_code"],
+				"description": mapping.get("description", line.get("descrizione", "")),
+				"qty": quantity,
+				"rate": rate,
+				"expense_account": mapping.get("account"),
+				"uom": uom,
+				"price_list_rate": rate,
+				"tax_rate": line.get("aliquota_iva", 0),
+				"tax_nature": line.get("natura"),
+			}
 
-            items.append(item_dict)
-        else:
-            # Crea riga automatica
-            items.append(
-                {
-                    "item_code": get_or_create_item_code(line),
-                    "description": line.get("descrizione", ""),
-                    "qty": quantity,
-                    "rate": rate,
-                    "uom": get_default_uom(),
-                    "price_list_rate": rate,
-                    "tax_rate": line.get("aliquota_iva", 0),
-                    "tax_nature": line.get("natura"),
-                }
-            )
+			items.append(item_dict)
+		else:
+			# Crea riga automatica
+			items.append(
+				{
+					"item_code": get_or_create_item_code(line),
+					"description": line.get("descrizione", ""),
+					"qty": quantity,
+					"rate": rate,
+					"uom": get_default_uom(),
+					"price_list_rate": rate,
+					"tax_rate": line.get("aliquota_iva", 0),
+					"tax_nature": line.get("natura"),
+				}
+			)
 
-    return items
+	return items
 
 
 def is_valid_invoice_line(line):
-    """Verifica se una riga fattura è valida per l'importazione"""
-    return line.get("prezzo_totale") is not None or line.get("quantita") is not None
+	"""Verifica se una riga fattura è valida per l'importazione"""
+	return line.get("prezzo_totale") is not None or line.get("quantita") is not None
 
 
 def get_line_quantity(line):
-    """Ottiene la quantità per una riga, con default a 1 per servizi"""
-    try:
-        if line.get("quantita") and float(line.get("quantita", 0)) > 0:
-            return float(line["quantita"])
-        elif line.get("prezzo_totale") and float(line.get("prezzo_totale", 0)) > 0:
-            # Servizio senza quantità
-            return 1
-    except (ValueError, TypeError):
-        pass
-    return 1
+	"""Ottiene la quantità per una riga, con default a 1 per servizi"""
+	try:
+		if line.get("quantita") and float(line.get("quantita", 0)) > 0:
+			return float(line["quantita"])
+		elif line.get("prezzo_totale") and float(line.get("prezzo_totale", 0)) > 0:
+			# Servizio senza quantità
+			return 1
+	except (ValueError, TypeError):
+		pass
+	return 1
 
 
 def prepare_invoice_taxes(invoice_summary, company, is_return=False):
-    """
-    Prepara le tasse per la fattura di acquisto
+	"""
+	Prepara le tasse per la fattura di acquisto
 
-    Args:
-        invoice_summary: Lista di riepiloghi IVA
-        company: Nome della società
-        is_return: True se è una nota di credito (inverte i segni)
+	Args:
+	    invoice_summary: Lista di riepiloghi IVA
+	    company: Nome della società
+	    is_return: True se è una nota di credito (inverte i segni)
 
-    Returns:
-        Lista di dizionari per le tasse
-    """
-    taxes = []
+	Returns:
+	    Lista di dizionari per le tasse
+	"""
+	taxes = []
 
-    for summary in invoice_summary:
-        tax_rate = float(summary.get("aliquota_iva", 0))
-        tax_account = get_tax_account(tax_rate, company)
+	for summary in invoice_summary:
+		tax_rate = float(summary.get("aliquota_iva", 0))
+		tax_account = get_tax_account(tax_rate, company)
 
-        tax_amount = invert_sign_for_credit_note(summary.get("imposta", 0), is_return)
-        total = invert_sign_for_credit_note(
-            summary.get("imponibile_importo", 0), is_return
-        )
+		tax_amount = invert_sign_for_credit_note(summary.get("imposta", 0), is_return)
+		total = invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return)
 
-        taxes.append(
-            {
-                "charge_type": "Actual",
-                "account_head": tax_account,
-                "tax_amount": tax_amount,
-                "rate": tax_rate,
-                "description": f"IVA {tax_rate}%",
-                "total": total,
-            }
-        )
+		taxes.append(
+			{
+				"charge_type": "Actual",
+				"account_head": tax_account,
+				"tax_amount": tax_amount,
+				"rate": tax_rate,
+				"description": f"IVA {tax_rate}%",
+				"total": total,
+			}
+		)
 
-    return taxes
+	return taxes
 
 
 def get_tax_account(tax_rate, company):
-    """
-    Restituisce l'account IVA in base all'aliquota
+	"""
+	Restituisce l'account IVA in base all'aliquota
 
-    Args:
-        tax_rate: Aliquota IVA
-        company: Nome company
+	Args:
+	    tax_rate: Aliquota IVA
+	    company: Nome company
 
-    Returns:
-        Nome dell'account IVA
-    """
-    tax_rate = round(float(tax_rate), 2)
+	Returns:
+	    Nome dell'account IVA
+	"""
+	tax_rate = round(float(tax_rate), 2)
 
-    # Cerca account con quella tax_rate
-    if tax_rate > 0:
-        tax_account = frappe.db.get_all(
-            "Account",
-            {"company": company, "tax_rate": tax_rate, "account_type": "Tax"},
-            ["name"],
-            limit=1,
-        )
-        if tax_account:
-            return tax_account[0]["name"]
+	# Cerca account con quella tax_rate
+	if tax_rate > 0:
+		tax_account = frappe.db.get_all(
+			"Account",
+			{"company": company, "tax_rate": tax_rate, "account_type": "Tax"},
+			["name"],
+			limit=1,
+		)
+		if tax_account:
+			return tax_account[0]["name"]
 
-    # Fallback all'account IVA default della company
-    default_tax = frappe.db.get_value("Company", company, "default_income_account")
+	# Fallback all'account IVA default della company
+	default_tax = frappe.db.get_value("Company", company, "default_income_account")
 
-    if default_tax:
-        return default_tax
+	if default_tax:
+		return default_tax
 
-    frappe.throw(f"Account IVA non trovato per aliquota {tax_rate}% in {company}")
+	frappe.throw(f"Account IVA non trovato per aliquota {tax_rate}% in {company}")
 
 
 def get_or_create_item_code(line):
-    """
-    Ottiene o crea un item code per la riga
+	"""
+	Ottiene o crea un item code per la riga
 
-    Args:
-        line: Riga fattura
+	Args:
+	    line: Riga fattura
 
-    Returns:
-        Item code
-    """
-    # Cerca per descrizione
-    descrizione = line.get("descrizione", "")
+	Returns:
+	    Item code
+	"""
+	# Cerca per descrizione
+	descrizione = line.get("descrizione", "")
 
-    if descrizione:
-        item_code = frappe.db.get_value("Item", {"item_name": descrizione}, "name")
-        if item_code:
-            return item_code
+	if descrizione:
+		item_code = frappe.db.get_value("Item", {"item_name": descrizione}, "name")
+		if item_code:
+			return item_code
 
-    # Usa item generico di default
-    return get_default_item_code()
+	# Usa item generico di default
+	return get_default_item_code()
 
 
 def get_default_supplier_group():
-    """Restituisce il gruppo fornitori di default"""
-    # Prima prova a prendere il default dal sistema
-    default = frappe.db.get_single_value("Buying Settings", "supplier_group")
-    if default:
-        return default
+	"""Restituisce il gruppo fornitori di default"""
+	# Prima prova a prendere il default dal sistema
+	default = frappe.db.get_single_value("Buying Settings", "supplier_group")
+	if default:
+		return default
 
-    # Cerca il primo gruppo disponibile (gestisce multilingua)
-    groups = frappe.get_all("Supplier Group", fields=["name"], limit=1)
-    if groups:
-        return groups[0]["name"]
+	# Cerca il primo gruppo disponibile (gestisce multilingua)
+	groups = frappe.get_all("Supplier Group", fields=["name"], limit=1)
+	if groups:
+		return groups[0]["name"]
 
-    frappe.throw("Nessun Supplier Group trovato nel sistema")
+	frappe.throw("Nessun Supplier Group trovato nel sistema")
 
 
 def get_default_uom():
-    """Restituisce l'UOM di default"""
-    default = frappe.db.get_single_value("Stock Settings", "stock_uom")
-    return default or "Nos"
+	"""Restituisce l'UOM di default"""
+	default = frappe.db.get_single_value("Stock Settings", "stock_uom")
+	return default or "Nos"
 
 
 def get_default_item_code():
-    """Restituisce l'item code di default per articoli generici"""
-    # Verifica se esiste un item generico
-    if frappe.db.exists("Item", "Servizi Generici"):
-        return "Servizi Generici"
+	"""Restituisce l'item code di default per articoli generici"""
+	# Verifica se esiste un item generico
+	if frappe.db.exists("Item", "Servizi Generici"):
+		return "Servizi Generici"
 
-    # Altrimenti prendine uno qualsiasi di tipo servizio
-    service_item = frappe.db.get_value(
-        "Item", {"is_stock_item": 0, "disabled": 0}, "name"
-    )
+	# Altrimenti prendine uno qualsiasi di tipo servizio
+	service_item = frappe.db.get_value("Item", {"is_stock_item": 0, "disabled": 0}, "name")
 
-    if service_item:
-        return service_item
+	if service_item:
+		return service_item
 
-    frappe.throw(
-        "Nessun articolo di tipo servizio trovato. Creare almeno un articolo generico."
-    )
+	frappe.throw("Nessun articolo di tipo servizio trovato. Creare almeno un articolo generico.")
 
 
 def get_country_name(country_code):
-    """
-    Converte codice paese in nome
+	"""
+	Converte codice paese in nome
 
-    Args:
-        country_code: Codice paese a 2 lettere
+	Args:
+	    country_code: Codice paese a 2 lettere
 
-    Returns:
-        Nome paese completo
-    """
-    if not country_code:
-        return "Italy"  # Default
+	Returns:
+	    Nome paese completo
+	"""
+	if not country_code:
+		return "Italy"  # Default
 
-    country_code = country_code.upper()
+	country_code = country_code.upper()
 
-    # Mappa i codici speciali
-    if country_code == "UK":
-        country_code = "GB"
+	# Mappa i codici speciali
+	if country_code == "UK":
+		country_code = "GB"
 
-    # Cerca nel database di ERPNext
-    country = frappe.db.get_value("Country", {"code": country_code}, "name")
+	# Cerca nel database di ERPNext
+	country = frappe.db.get_value("Country", {"code": country_code}, "name")
 
-    if country:
-        return country
+	if country:
+		return country
 
-    # Fallback a mapping statico per i più comuni
-    country_mapping = {
-        "IT": "Italy",
-        "DE": "Germany",
-        "FR": "France",
-        "ES": "Spain",
-        "GB": "United Kingdom",
-        "US": "United States",
-        "CH": "Switzerland",
-        "AT": "Austria",
-    }
+	# Fallback a mapping statico per i più comuni
+	country_mapping = {
+		"IT": "Italy",
+		"DE": "Germany",
+		"FR": "France",
+		"ES": "Spain",
+		"GB": "United Kingdom",
+		"US": "United States",
+		"CH": "Switzerland",
+		"AT": "Austria",
+	}
 
-    return country_mapping.get(country_code, "Italy")
+	return country_mapping.get(country_code, "Italy")
 
 
 @frappe.whitelist()
 def check_document_type(document_type_code):
-    """
-    Verifica il tipo di documento e avvisa se è un'autofattura
+	"""
+	Verifica il tipo di documento e avvisa se è un'autofattura
 
-    Args:
-        document_type_code: Codice tipo documento (es. "TD01")
+	Args:
+	    document_type_code: Codice tipo documento (es. "TD01")
 
-    Returns:
-        True se è un'autofattura, False altrimenti
-    """
-    try:
-        doc_type = frappe.get_doc(
-            "Tipologia di documento e-Invoice", document_type_code
-        )
-        if doc_type.tipologia == "AutoFattura":
-            frappe.msgprint(
-                f"Attenzione: Il documento {document_type_code} è un'autofattura",
-                title="Autofattura rilevata",
-                indicator="orange",
-            )
-            return True
-    except frappe.DoesNotExistError:
-        frappe.log_error(
-            f"Tipo documento {document_type_code} non trovato",
-            "Italian Invoice Passive",
-        )
+	Returns:
+	    True se è un'autofattura, False altrimenti
+	"""
+	try:
+		doc_type = frappe.get_doc("Tipologia di documento e-Invoice", document_type_code)
+		if doc_type.tipologia == "AutoFattura":
+			frappe.msgprint(
+				f"Attenzione: Il documento {document_type_code} è un'autofattura",
+				title="Autofattura rilevata",
+				indicator="orange",
+			)
+			return True
+	except frappe.DoesNotExistError:
+		frappe.log_error(
+			f"Tipo documento {document_type_code} non trovato",
+			"Italian Invoice Passive",
+		)
 
-    return False
+	return False

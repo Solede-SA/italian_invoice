@@ -35,14 +35,14 @@ const getCustomerTipoFatturaElettronica = (frm) => {
               frm.set_value("naming_series", "SINV/.YY./")
             }
           }
-          
-          
+
+
           if (r.message.tax_id) {
             frm.set_value("tax_id", r.message.tax_id);
           } else {
             frm.set_value("tax_id", r.message.fiscal_code);
           }
-          
+
         });
   }
 }
@@ -80,10 +80,10 @@ frappe.ui.form.on("Sales Invoice", {
   refresh: (frm) => {
     frm.remove_custom_button("Generate E-Invoice");
     frm.set_df_property('vat_collectability', 'read_only', 0)
-    
+
     // Aggiungi un indicatore se c'è discrepanza tra due_date e payment_schedule
     check_due_date_consistency(frm);
-    
+
     // Aggiungi bottone per ricalcolo manuale se ci sono payment terms
     if (frm.doc.payment_terms_template && !frm.doc.__islocal) {
         frm.add_custom_button(__('Recalculate Payment Schedule'), function() {
@@ -104,7 +104,7 @@ frappe.ui.form.on("Sales Invoice", {
             });
         }, __('Actions'));
     }
-    
+
    if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
       frm.add_custom_button(
         __("Scarica XML"),
@@ -152,7 +152,7 @@ frappe.ui.form.on("Sales Invoice", {
       frm.set_value("custom_tipo_di_documento", "TD24");
       frm.set_value("naming_series", "SINV/.YY./");
     }
-      
+
   },
   is_debit_note : (frm) => {
     if (frm.doc.is_debit_note){
@@ -165,7 +165,7 @@ frappe.ui.form.on("Sales Invoice", {
   },
   onload: (frm) => {
     getCustomerTipoFatturaElettronica(frm);
-    
+
     // Se c'è un payment terms template ma nessun payment schedule, ricalcola
     if (frm.doc.payment_terms_template && (!frm.doc.payment_schedule || frm.doc.payment_schedule.length === 0)) {
         frm.trigger('payment_terms_template');
@@ -205,7 +205,7 @@ frappe.ui.form.on("Sales Invoice", {
                     if (r.message && r.message.length > 0) {
                         // Pulisci il payment schedule esistente
                         frm.clear_table('payment_schedule');
-                        
+
                         // Aggiungi le nuove righe
                         r.message.forEach(function(term) {
                             let row = frm.add_child('payment_schedule');
@@ -217,9 +217,9 @@ frappe.ui.form.on("Sales Invoice", {
                             row.outstanding = term.outstanding || term.payment_amount;
                             row.paid_amount = 0;
                         });
-                        
+
                         frm.refresh_field('payment_schedule');
-                        
+
                         // Aggiorna la due_date principale con la scadenza più lontana
                         update_main_due_date(frm);
                     } else {
@@ -243,11 +243,11 @@ frappe.ui.form.on("Sales Invoice", {
   },
   validate: (frm) => {
     updateTaxRate(frm);
-    if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04") 
+    if (frm.doc.is_return && frm.doc.custom_tipo_di_documento !== "TD04")
       frappe.throw(__("Tipo di documento must be TD04 for return invoice"));
     if (frm.doc.is_debit_note && frm.doc.custom_tipo_di_documento !== "TD05")
       frappe.throw(__("Tipo di documento must be TD05 for debit note"));
-    
+
     // Prima della validazione, assicurati che la due_date sia corretta
     update_main_due_date(frm);
   },
@@ -256,7 +256,7 @@ frappe.ui.form.on("Sales Invoice", {
     if (frm.doc.payment_schedule && frm.doc.payment_schedule.length > 0) {
         update_main_due_date(frm);
     }
-    
+
     let responce = await frappe.db.get_value("Customer", frm.doc.customer, ['is_public_administration', 'name']);
     let customer = responce.message;
     if (customer.is_public_administration) {
@@ -325,7 +325,7 @@ frappe.ui.form.on('Payment Schedule', {
         // Quando cambia una due_date nel payment schedule
         update_main_due_date(frm);
     },
-    
+
     payment_schedule_remove: function(frm, cdt, cdn) {
         // Quando viene rimossa una riga
         update_main_due_date(frm);
@@ -338,16 +338,16 @@ function update_main_due_date(frm) {
         let due_dates = frm.doc.payment_schedule
             .filter(row => row.due_date)
             .map(row => row.due_date); // Le date sono già stringhe nel formato corretto
-        
+
         if (due_dates.length > 0) {
             // Ordina le date e prendi l'ultima
             due_dates.sort();
             let max_due_date = due_dates[due_dates.length - 1];
-            
+
             // Aggiorna solo se diversa
             if (frm.doc.due_date !== max_due_date) {
                 frm.set_value('due_date', max_due_date);
-                
+
                 // Mostra notifica
                 frappe.show_alert({
                     message: __('Due date updated based on payment schedule'),
@@ -364,10 +364,10 @@ function check_due_date_consistency(frm) {
         let due_dates = frm.doc.payment_schedule
             .filter(row => row.due_date)
             .map(row => row.due_date);
-        
+
         if (due_dates.length > 0) {
             let max_schedule_date = due_dates.sort().reverse()[0];
-            
+
             if (frm.doc.due_date && frm.doc.due_date !== max_schedule_date) {
                 // Mostra un indicatore di warning
                 frm.dashboard.add_comment(
@@ -387,25 +387,25 @@ function calculate_payment_schedule_manually(frm) {
     if (!frm.doc.payment_terms_template || !frm.doc.posting_date) {
         return;
     }
-    
+
     // Ottieni i dettagli del payment terms template
     frappe.db.get_doc('Payment Terms Template', frm.doc.payment_terms_template)
         .then(template => {
             if (template.terms && template.terms.length > 0) {
                 frm.clear_table('payment_schedule');
-                
+
                 template.terms.forEach(term_detail => {
                     // term_detail contiene già tutti i campi necessari dal Payment Terms Template Detail
                     // che ha fatto fetch_from del Payment Term
                     let due_date = calculate_due_date_from_term(frm.doc.posting_date, term_detail);
-                    
+
                     let row = frm.add_child('payment_schedule');
                     row.payment_term = term_detail.payment_term;
                     row.description = term_detail.description;
                     row.due_date = due_date;
                     row.invoice_portion = term_detail.invoice_portion || 100;
                     row.mode_of_payment = term_detail.mode_of_payment;
-                    
+
                     // Per nuove fatture, non calcolare l'importo se grand_total è 0
                     if (frm.doc.grand_total && frm.doc.grand_total > 0) {
                         let amount = (frm.doc.grand_total * (term_detail.invoice_portion || 100)) / 100;
@@ -420,7 +420,7 @@ function calculate_payment_schedule_manually(frm) {
                     }
                     row.paid_amount = 0;
                 });
-                
+
                 frm.refresh_field('payment_schedule');
                 update_main_due_date(frm);
             }
@@ -433,7 +433,7 @@ function calculate_payment_schedule_manually(frm) {
 function calculate_due_date_from_term(posting_date, term) {
     // Calcola la due_date basandosi sul tipo di termine di pagamento
     let due_date;
-    
+
     if (term.due_date_based_on === "Day(s) after invoice date") {
         due_date = frappe.datetime.add_days(posting_date, term.credit_days || 0);
     } else if (term.due_date_based_on === "Day(s) after the end of the invoice month") {
@@ -448,6 +448,6 @@ function calculate_due_date_from_term(posting_date, term) {
         // Default: same as posting date
         due_date = posting_date;
     }
-    
+
     return due_date;
 }

@@ -228,103 +228,103 @@ after_install = "italian_invoice.install.after_install"
 # }
 
 doctype_js = {
-    "Sales Invoice": "public/js/custom_sales_invoice.js",
-    "Purchase Invoice": "public/js/custom_purchase_invoice.js",
-    "Quotation": "public/js/custom_quotation.js",
-    "Delivery Note": "public/js/custom_delivery_note.js",
+	"Sales Invoice": "public/js/custom_sales_invoice.js",
+	"Purchase Invoice": "public/js/custom_purchase_invoice.js",
+	"Quotation": "public/js/custom_quotation.js",
+	"Delivery Note": "public/js/custom_delivery_note.js",
 }
 
 doc_events = {
-    "Sales Invoice": {
-        "before_save": "italian_invoice.crud_events.sales_invoice.before_save.execute",
-        "on_cancel": "italian_invoice.crud_events.sales_invoice.on_cancel.execute",
-        "validate": "italian_invoice.crud_events.sales_invoice.validate.execute",
-    },
-    "Payment Entry": {
-        "validate": [
-            "italian_invoice.crud_events.payment_entry.adjust_allocated_amount_for_rounding",
-            "italian_invoice.crud_events.payment_entry.handle_rounding",
-        ],
-        "before_submit": "italian_invoice.crud_events.payment_entry.validate_rounding_on_submit",
-        "after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
-    },
-    "Purchase Invoice": {
-        "on_submit": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_submit",
-        "on_cancel": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_cancel",
-    },
+	"Sales Invoice": {
+		"before_save": "italian_invoice.crud_events.sales_invoice.before_save.execute",
+		"on_cancel": "italian_invoice.crud_events.sales_invoice.on_cancel.execute",
+		"validate": "italian_invoice.crud_events.sales_invoice.validate.execute",
+	},
+	"Payment Entry": {
+		"validate": [
+			"italian_invoice.crud_events.payment_entry.adjust_allocated_amount_for_rounding",
+			"italian_invoice.crud_events.payment_entry.handle_rounding",
+		],
+		"before_submit": "italian_invoice.crud_events.payment_entry.validate_rounding_on_submit",
+		"after_insert": "italian_invoice.crud_events.payment_entry.after_insert",
+	},
+	"Purchase Invoice": {
+		"on_submit": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_submit",
+		"on_cancel": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_cancel",
+	},
 }
 
 fixtures = [
-    {
-        "dt": "Custom Field",
-        "filters": [
-            [
-                "module",
-                "in",
-                [
-                    "Italian Invoice",
-                ],
-            ],
-        ],
-    },
-    {
-        "dt": "Workspace",
-        "filters": [
-            [
-                "module",
-                "in",
-                [
-                    "Italian Invoice",
-                ],
-            ],
-        ],
-    },
-    {
-        "dt": "Print Format",
-        "filters": [
-            [
-                "module",
-                "in",
-                [
-                    "Italian Invoice",
-                ],
-            ],
-        ],
-    },
-    {
-        "dt": "Web Form",
-        "filters": [
-            [
-                "module",
-                "in",
-                [
-                    "Italian Invoice",
-                ],
-            ],
-        ],
-    },
-    {
-        "dt": "Property Setter",
-        "filters": [
-            [
-                "module",
-                "in",
-                [
-                    "Italian Invoice",
-                ],
-            ],
-        ],
-    },
-    {
-        "dt": "Report",
-        "filters": [
-            [
-                "name",
-                "in",
-                [
-                    "Registro IVA",
-                ],
-            ],
-        ],
-    },
+	{
+		"dt": "Custom Field",
+		"filters": [
+			[
+				"module",
+				"in",
+				[
+					"Italian Invoice",
+				],
+			],
+		],
+	},
+	{
+		"dt": "Workspace",
+		"filters": [
+			[
+				"module",
+				"in",
+				[
+					"Italian Invoice",
+				],
+			],
+		],
+	},
+	{
+		"dt": "Print Format",
+		"filters": [
+			[
+				"module",
+				"in",
+				[
+					"Italian Invoice",
+				],
+			],
+		],
+	},
+	{
+		"dt": "Web Form",
+		"filters": [
+			[
+				"module",
+				"in",
+				[
+					"Italian Invoice",
+				],
+			],
+		],
+	},
+	{
+		"dt": "Property Setter",
+		"filters": [
+			[
+				"module",
+				"in",
+				[
+					"Italian Invoice",
+				],
+			],
+		],
+	},
+	{
+		"dt": "Report",
+		"filters": [
+			[
+				"name",
+				"in",
+				[
+					"Registro IVA",
+				],
+			],
+		],
+	},
 ]

@@ -16,6 +16,7 @@ class TestBasicFunctionality(FrappeTestCase):
 		"""Test that the module is accessible."""
 		try:
 			import italian_invoice
+
 			self.assertTrue(True)
 		except ImportError:
 			self.fail("italian_invoice module not found")

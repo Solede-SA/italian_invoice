@@ -8,7 +8,7 @@ frappe.ui.form.on("Transazione SDI", {
         frm.set_df_property('notifiche_sdi', 'cannot_add_rows', true); // Hide add row button
         frm.set_df_property('notifiche_sdi', 'cannot_delete_rows', true); // Hide delete button
         frm.set_df_property('notifiche_sdi', 'cannot_delete_all_rows', true); // Hide delete all button
-        
+
         if (frm.doc.notifiche_sdi && frm.doc.notifiche_sdi.length) {
             frm.doc.notifiche_sdi.sort((a, b) => {
                 return new Date(b.data_notifica) - new Date(a.data_notifica);
@@ -58,7 +58,7 @@ frappe.ui.form.on("Transazione SDI", {
 
             displayNotification(dataToDisplay, notificationContainer);
         }
-                
+
 
     }
 });

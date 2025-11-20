@@ -20,7 +20,7 @@
                 </ContattiTrasmittente>
             {% endif %}
         </DatiTrasmissione>
-    
+
         <CedentePrestatore>
             <DatiAnagrafici>
                 <IdFiscaleIVA>
@@ -85,7 +85,7 @@
                         <Denominazione>{{ doc.cessionario_committente.name }}</Denominazione>
                     </Anagrafica>
                 {% endif %}
-            </DatiAnagrafici>   
+            </DatiAnagrafici>
             <Sede>
                 {{ macros.render_address(doc.cessionario_committente.address) }}
             </Sede>
@@ -144,7 +144,7 @@
                 {%- endif %}
             {%- endfor %}
         </DatiGenerali>
-    
+
         <DatiBeniServizi>
             {% for item in doc.e_invoice_items %}
             <DettaglioLinee>
@@ -204,11 +204,11 @@
                     {% set dn_detail = frappe.get_doc("Delivery Note Item", item.dn_detail) %}
                     {%- if dn_detail %}
                         {% if dn_detail.serial_and_batch_bundle %}
-                            {{ macros.getLotto (dn_detail.serial_and_batch_bundle, item)  }} 
-                        {% endif %} 
+                            {{ macros.getLotto (dn_detail.serial_and_batch_bundle, item)  }}
+                        {% endif %}
                     {%- endif %}
-                   
-                    
+
+
                 {% endif %}
             </DettaglioLinee>
             {% endfor %}
@@ -229,7 +229,7 @@
             </DatiRiepilogo>
             {% endfor %}
         </DatiBeniServizi>
-    
+
         <DatiPagamento>
             {% if doc.payment_schedule|length > 1 %}
                 <CondizioniPagamento>TP01</CondizioniPagamento>
@@ -246,7 +246,7 @@
                         <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount) }}</ImportoPagamento>
                     {% endif %}
                     {% if payment_term.bank_account %}
-                        
+
                         <IstitutoFinanziario>{{ payment_term.bank_account_name }}</IstitutoFinanziario>
                         <IBAN>{{ payment_term.bank_account_iban }}</IBAN>
                         <ABI>{{ payment_term.bank_account_iban[5:10] }}</ABI>
@@ -262,7 +262,7 @@
                             {% if bank_account.swift_number%}
                                 <BIC>{{ bank_account.swift_number }}</BIC>
                             {% endif %}
-                        {% endif %}                        
+                        {% endif %}
                     {% endif %}
                 </DettaglioPagamento>
             {% endfor %}

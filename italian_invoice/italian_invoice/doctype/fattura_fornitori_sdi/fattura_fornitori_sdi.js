@@ -85,7 +85,7 @@ function show_items_dialog(frm, supplier_data) {
        // Include all lines with valid prezzo_totale or quantita (including negative values)
        return line.prezzo_totale != null || line.quantita != null;
    });
-   
+
    // Display info about filtered lines
    if (allLines.length !== invoice_lines.length) {
        const skippedCount = allLines.length - invoice_lines.length;
@@ -109,7 +109,7 @@ function show_items_dialog(frm, supplier_data) {
            `
        },
        {
-           fieldtype: 'Section Break', 
+           fieldtype: 'Section Break',
            label: 'Prodotti in Fattura'
        }
    ];
