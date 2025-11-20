@@ -52,6 +52,26 @@ def before_tests():
 			ignore_permissions=True, ignore_if_duplicate=True
 		)
 
+	# Create Gender options
+	genders = ["Male", "Female", "Other"]
+	for gender in genders:
+		if not frappe.db.exists("Gender", gender):
+			frappe.get_doc({"doctype": "Gender", "gender": gender}).insert(
+				ignore_permissions=True, ignore_if_duplicate=True
+			)
+
+	# Create Department
+	if not frappe.db.exists("Department", "All Departments"):
+		frappe.get_doc({"doctype": "Department", "department_name": "All Departments", "is_group": 1}).insert(
+			ignore_permissions=True, ignore_if_duplicate=True
+		)
+
+	# Create Employment Type
+	if not frappe.db.exists("Employment Type", "Full-time"):
+		frappe.get_doc({"doctype": "Employment Type", "employee_type_name": "Full-time"}).insert(
+			ignore_permissions=True, ignore_if_duplicate=True
+		)
+
 	frappe.db.commit()
 
 	# Monkey patch Company creation to always include the custom field
