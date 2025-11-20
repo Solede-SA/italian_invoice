@@ -1,14 +1,20 @@
-name: Lint and Format
+name: Linters
 
 on:
   pull_request:
-    branches: [ develop, main ]
-  push:
-    branches: [ develop, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linters-${{ github.event_name }}-${{ github.event.number }}
+  cancel-in-progress: true
 
 jobs:
-  lint-python:
+  frappe-linter:
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
 
     steps:
       - name: Checkout code
@@ -18,44 +24,44 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: pip
 
-      - name: Install dependencies
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
+      - name: Clone Frappe semgrep rules
+        run: git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules
+
+      - name: Install semgrep
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install semgrep
 
-      - name: Lint with ruff
-        run: |
-          # Check for errors
-          ruff check italian_invoice/
+      - name: Run semgrep
+        run: semgrep ci --config ./frappe-semgrep-rules/rules --config "p/python"
 
-      - name: Format check with ruff
-        run: |
-          # Check formatting
-          ruff format --check italian_invoice/
-
-  lint-javascript:
+  vulnerable-dependency-check:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
         with:
-          node-version: '18'
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml', 'setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - name: Install dependencies
+      - name: Install and run pip-audit
         run: |
-          npm install -g eslint prettier
-
-      - name: Lint JavaScript
-        run: |
-          # Lint JS files
-          eslint italian_invoice/public/js/*.js || true
-
-      - name: Check formatting
-        run: |
-          # Check prettier formatting
-          prettier --check "italian_invoice/public/js/*.js" || true
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          pip-audit --desc .

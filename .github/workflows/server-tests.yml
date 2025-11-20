@@ -1,0 +1,125 @@
+name: Server Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+
+concurrency:
+  group: server-tests-${{ github.event_name }}-${{ github.event.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        container: [1]
+
+    services:
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+
+      - name: Add to Hosts
+        run: |
+          echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+
+      - name: Install MariaDB Client
+        run: sudo apt-get install -y mariadb-client
+
+      - name: Install bench
+        run: |
+          pip install frappe-bench
+
+      - name: Initialize Frappe bench
+        run: |
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+
+      - name: Setup hosts
+        run: |
+          bench setup socketio --port 9000
+          bench setup requirements --node
+        working-directory: ~/frappe-bench
+
+      - name: Install Frappe
+        run: |
+          bench get-app --branch version-15 --resolve-deps frappe
+          bench setup requirements --dev
+        working-directory: ~/frappe-bench
+
+      - name: Install ERPNext
+        run: |
+          bench get-app --branch version-15 --resolve-deps erpnext
+        working-directory: ~/frappe-bench
+
+      - name: Install Italian Invoice
+        run: |
+          bench get-app $GITHUB_WORKSPACE
+          bench setup requirements --dev
+        working-directory: ~/frappe-bench
+
+      - name: Configure database
+        run: |
+          bench set-config -g db_host 127.0.0.1
+          bench set-config -g db_port 3306
+          bench set-config -g redis_cache "redis://127.0.0.1:13000"
+          bench set-config -g redis_queue "redis://127.0.0.1:11000"
+          bench set-config -g redis_socketio "redis://127.0.0.1:12000"
+        working-directory: ~/frappe-bench
+
+      - name: Create test site
+        run: |
+          bench new-site --db-root-password root --admin-password admin --mariadb-root-password root test_site
+          bench --site test_site install-app erpnext
+          bench --site test_site install-app italian_invoice
+        working-directory: ~/frappe-bench
+
+      - name: Run tests
+        run: |
+          bench --site test_site set-config allow_tests true
+          bench --site test_site run-tests --app italian_invoice --coverage
+        working-directory: ~/frappe-bench
+
+      - name: Upload coverage reports
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: false
+          verbose: true
