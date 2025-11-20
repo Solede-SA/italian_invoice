@@ -154,7 +154,7 @@ after_install = "italian_invoice.install.after_install"
 # Testing
 # -------
 
-before_tests = "italian_invoice.tests.fixtures.before_tests"
+# before_tests = "italian_invoice.install.before_tests"
 
 # Overriding Methods
 # ------------------------------

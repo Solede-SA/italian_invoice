@@ -7,6 +7,32 @@ from frappe.tests.utils import FrappeTestCase
 class TestBasicFunctionality(FrappeTestCase):
 	"""Test basic app functionality."""
 
+	@classmethod
+	def setUpClass(cls):
+		"""Setup test data before running tests."""
+		super().setUpClass()
+		# Create or update test company with required custom fields
+		if not frappe.db.exists("Company", "_Test Italian Company"):
+			company = frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": "_Test Italian Company",
+					"abbr": "_TIC",
+					"default_currency": "EUR",
+					"country": "Italy",
+					"custom_codice_sistema_interscambio": "0000000",
+				}
+			)
+			company.insert(ignore_if_duplicate=True)
+			frappe.db.commit()
+		else:
+			# Update existing company with custom field
+			company = frappe.get_doc("Company", "_Test Italian Company")
+			if hasattr(company, "custom_codice_sistema_interscambio"):
+				company.custom_codice_sistema_interscambio = "0000000"
+				company.save(ignore_permissions=True)
+				frappe.db.commit()
+
 	def test_app_installed(self):
 		"""Test that the app is properly installed."""
 		installed_apps = frappe.get_installed_apps()
@@ -20,3 +46,12 @@ class TestBasicFunctionality(FrappeTestCase):
 			self.assertTrue(True)
 		except ImportError:
 			self.fail("italian_invoice module not found")
+
+	def test_company_custom_fields(self):
+		"""Test that custom fields are properly added to Company."""
+		company = frappe.get_doc("Company", "_Test Italian Company")
+		self.assertTrue(
+			hasattr(company, "custom_codice_sistema_interscambio"),
+			"Company should have custom_codice_sistema_interscambio field",
+		)
+		self.assertEqual(company.custom_codice_sistema_interscambio, "0000000")
