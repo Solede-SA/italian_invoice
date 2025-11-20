@@ -73,7 +73,7 @@ jobs:
 
       - name: Setup hosts
         run: |
-          bench setup socketio --port 9000
+          bench setup socketio
           bench setup requirements --node
         working-directory: /home/runner/frappe-bench
 
