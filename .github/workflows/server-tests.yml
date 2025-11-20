@@ -69,18 +69,12 @@ jobs:
 
       - name: Initialize Frappe bench
         run: |
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" /home/runner/frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --frappe-branch version-15 --python "$(which python)" /home/runner/frappe-bench
 
       - name: Setup hosts
         run: |
           bench setup socketio
           bench setup requirements --node
-        working-directory: /home/runner/frappe-bench
-
-      - name: Install Frappe
-        run: |
-          bench get-app --branch version-15 --resolve-deps frappe
-          bench setup requirements --dev
         working-directory: /home/runner/frappe-bench
 
       - name: Install ERPNext
