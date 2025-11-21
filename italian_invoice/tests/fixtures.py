@@ -38,21 +38,18 @@ def _create_missing_master_data():
 
 def _override_company_test_records():
 	"""Override Company test records to include custom_codice_sistema_interscambio field."""
-	# Load our custom test records
-	custom_records_path = os.path.join(
-		os.path.dirname(__file__), "..", "overrides", "company_test_records.json"
-	)
+	# Monkey patch frappe.get_test_records to add custom field to Company records
+	original_get_test_records = frappe.get_test_records
 
-	if os.path.exists(custom_records_path):
-		with open(custom_records_path) as f:
-			custom_records = json.load(f)
+	def patched_get_test_records(doctype, *args, **kwargs):
+		records = original_get_test_records(doctype, *args, **kwargs)
 
-		# Monkey patch frappe.get_test_records for Company to return our custom records
-		original_get_test_records = frappe.get_test_records
+		# Add custom_codice_sistema_interscambio to all Company records
+		if doctype == "Company" and records:
+			for record in records:
+				if not record.get("custom_codice_sistema_interscambio"):
+					record["custom_codice_sistema_interscambio"] = "0000000"
 
-		def patched_get_test_records(doctype, *args, **kwargs):
-			if doctype == "Company":
-				return custom_records
-			return original_get_test_records(doctype, *args, **kwargs)
+		return records
 
-		frappe.get_test_records = patched_get_test_records
+	frappe.get_test_records = patched_get_test_records
