@@ -6,6 +6,16 @@ from frappe.tests.utils import FrappeTestCase
 # Ignore these doctypes as they are created by Company itself
 test_ignore = ["Account", "Cost Center", "Payment Terms Template", "Salary Component", "Warehouse"]
 
+# Ensure these doctypes have test records before running tests
+test_dependencies = [
+	"Warehouse Type",
+	"UOM",
+	"Customer Group",
+	"Supplier Group",
+	"Territory",
+	"Fiscal Year",
+]
+
 
 class TestBasicFunctionality(FrappeTestCase):
 	"""Test basic app functionality."""
