@@ -107,7 +107,7 @@ jobs:
       - name: Run tests
         run: |
           bench --site test_site set-config allow_tests true
-          bench --site test_site run-tests --app italian_invoice --coverage
+          bench --site test_site run-tests --app italian_invoice --coverage --skip-test-records
         working-directory: /home/runner/frappe-bench
 
       - name: Upload coverage reports
