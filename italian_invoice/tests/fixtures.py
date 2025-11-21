@@ -1,5 +1,8 @@
 """Test fixtures for Italian Invoice app."""
 
+import json
+import os
+
 import frappe
 
 
@@ -7,79 +10,27 @@ def before_tests():
 	"""Setup test fixtures before running tests."""
 	frappe.flags.in_test = True
 
-	# Create necessary Warehouse Types for ERPNext
-	warehouse_types = ["Transit", "Regular", "Fixed Asset"]
-	for wh_type in warehouse_types:
-		if not frappe.db.exists("Warehouse Type", wh_type):
-			frappe.get_doc({"doctype": "Warehouse Type", "name": wh_type}).insert(
-				ignore_permissions=True, ignore_if_duplicate=True
-			)
+	# Override Company test records with our custom ones that include custom fields
+	_override_company_test_records()
 
-	# Create UOM if not exists
-	if not frappe.db.exists("UOM", "Nos"):
-		frappe.get_doc({"doctype": "UOM", "uom_name": "Nos"}).insert(
-			ignore_permissions=True, ignore_if_duplicate=True
-		)
 
-	if not frappe.db.exists("UOM", "Unit"):
-		frappe.get_doc({"doctype": "UOM", "uom_name": "Unit"}).insert(
-			ignore_permissions=True, ignore_if_duplicate=True
-		)
+def _override_company_test_records():
+	"""Override Company test records to include custom_codice_sistema_interscambio field."""
+	# Load our custom test records
+	custom_records_path = os.path.join(
+		os.path.dirname(__file__), "..", "overrides", "company_test_records.json"
+	)
 
-	# Create Customer Group hierarchy
-	if not frappe.db.exists("Customer Group", "All Customer Groups"):
-		frappe.get_doc(
-			{
-				"doctype": "Customer Group",
-				"customer_group_name": "All Customer Groups",
-				"is_group": 1,
-			}
-		).insert(ignore_permissions=True, ignore_if_duplicate=True)
+	if os.path.exists(custom_records_path):
+		with open(custom_records_path) as f:
+			custom_records = json.load(f)
 
-	# Create Supplier Group hierarchy
-	if not frappe.db.exists("Supplier Group", "All Supplier Groups"):
-		frappe.get_doc(
-			{
-				"doctype": "Supplier Group",
-				"supplier_group_name": "All Supplier Groups",
-				"is_group": 1,
-			}
-		).insert(ignore_permissions=True, ignore_if_duplicate=True)
+		# Monkey patch frappe.get_test_records for Company to return our custom records
+		original_get_test_records = frappe.get_test_records
 
-	# Create Territory hierarchy
-	if not frappe.db.exists("Territory", "All Territories"):
-		frappe.get_doc({"doctype": "Territory", "territory_name": "All Territories", "is_group": 1}).insert(
-			ignore_permissions=True, ignore_if_duplicate=True
-		)
+		def patched_get_test_records(doctype, *args, **kwargs):
+			if doctype == "Company":
+				return custom_records
+			return original_get_test_records(doctype, *args, **kwargs)
 
-	# Create Gender options
-	genders = ["Male", "Female", "Other"]
-	for gender in genders:
-		if not frappe.db.exists("Gender", gender):
-			frappe.get_doc({"doctype": "Gender", "gender": gender}).insert(
-				ignore_permissions=True, ignore_if_duplicate=True
-			)
-
-	# Create Department
-	if not frappe.db.exists("Department", "All Departments"):
-		frappe.get_doc({"doctype": "Department", "department_name": "All Departments", "is_group": 1}).insert(
-			ignore_permissions=True, ignore_if_duplicate=True
-		)
-
-	# Create Employment Type
-	if not frappe.db.exists("Employment Type", "Full-time"):
-		frappe.get_doc({"doctype": "Employment Type", "employee_type_name": "Full-time"}).insert(
-			ignore_permissions=True, ignore_if_duplicate=True
-		)
-
-	frappe.db.commit()
-
-	# Monkey patch Company creation to always include the custom field
-	original_insert = frappe.model.document.Document.insert
-
-	def patched_insert(self, *args, **kwargs):
-		if self.doctype == "Company" and not self.get("custom_codice_sistema_interscambio"):
-			self.custom_codice_sistema_interscambio = "0000000"
-		return original_insert(self, *args, **kwargs)
-
-	frappe.model.document.Document.insert = patched_insert
+		frappe.get_test_records = patched_get_test_records
