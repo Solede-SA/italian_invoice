@@ -36,8 +36,27 @@ class TestBasicFunctionality(FrappeTestCase):
 
 	def test_company_custom_fields(self):
 		"""Test that custom fields are properly added to Company."""
-		# Get the test company created by Frappe test runner
-		company = frappe.get_doc("Company", "_Test Company")
+		# Create required master data first
+		for wh_type in ["Transit", "Regular", "Fixed Asset"]:
+			if not frappe.db.exists("Warehouse Type", wh_type):
+				frappe.get_doc({"doctype": "Warehouse Type", "name": wh_type}).insert(ignore_permissions=True)
+
+		# Create a minimal test company to verify custom field exists
+		if not frappe.db.exists("Company", "_Test Italian Company"):
+			company = frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": "_Test Italian Company",
+					"abbr": "_TIC",
+					"default_currency": "EUR",
+					"country": "Italy",
+					"custom_codice_sistema_interscambio": "0000000",
+				}
+			)
+			company.insert(ignore_permissions=True)
+
+		company = frappe.get_doc("Company", "_Test Italian Company")
+
 		self.assertTrue(
 			hasattr(company, "custom_codice_sistema_interscambio"),
 			"Company should have custom_codice_sistema_interscambio field",
