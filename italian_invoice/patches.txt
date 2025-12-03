@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 italian_invoice.patches.v1_0.remove_duplicate_regional_fields
 italian_invoice.patches.v1_1.migrate_name_fields_to_avoid_conflicts
+italian_invoice.patches.v1_2.remove_translatable_from_name_fields

@@ -228,6 +228,7 @@ before_tests = "italian_invoice.tests.fixtures.before_tests"
 # }
 
 doctype_js = {
+	"Customer": "public/js/custom_customer.js",
 	"Sales Invoice": "public/js/custom_sales_invoice.js",
 	"Purchase Invoice": "public/js/custom_purchase_invoice.js",
 	"Quotation": "public/js/custom_quotation.js",
