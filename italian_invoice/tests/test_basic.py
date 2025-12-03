@@ -3,6 +3,8 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from italian_invoice.install import fix_erpnext_italy_duplicate_fields
+
 # Ignore these doctypes as they are created by Company itself
 test_ignore = ["Account", "Cost Center", "Payment Terms Template", "Salary Component", "Warehouse"]
 
@@ -36,6 +38,10 @@ class TestBasicFunctionality(FrappeTestCase):
 
 	def test_company_custom_fields(self):
 		"""Test that custom fields are properly added to Company."""
+		# Fix ERPNext Italy duplicate fields before creating Company
+		# This prevents ValidationError when Italy regional setup runs
+		fix_erpnext_italy_duplicate_fields()
+
 		# Create required master data first
 		for wh_type in ["Transit", "Regular", "Fixed Asset"]:
 			if not frappe.db.exists("Warehouse Type", wh_type):
