@@ -1,4 +1,8 @@
 const getCustomerTipoFatturaElettronica = (frm) => {
+  // Non modificare documenti già submitted
+  if (frm.doc.docstatus !== 0) {
+    return true;
+  }
   if (frm.doc.is_return) {
     frm.set_value("custom_tipo_di_documento", "TD04");
     frm.set_value("naming_series", "NCINV/.YY./");
