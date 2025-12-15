@@ -1,0 +1,101 @@
+[
+ {
+  "codice": "stored",
+  "descrizione": "Fattura Archiviata",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.796612",
+  "name": "stored",
+  "spiegazione": null
+ },
+ {
+  "codice": "RC",
+  "descrizione": "Ricevuta consegna",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.958595",
+  "name": "RC",
+  "spiegazione": null
+ },
+ {
+  "codice": "NS",
+  "descrizione": "Notifica di scarto",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.960600",
+  "name": "NS",
+  "spiegazione": null
+ },
+ {
+  "codice": "NE",
+  "descrizione": "Notifica esito",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.962542",
+  "name": "NE",
+  "spiegazione": null
+ },
+ {
+  "codice": "MC",
+  "descrizione": "Mancata consegna",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.964387",
+  "name": "MC",
+  "spiegazione": null
+ },
+ {
+  "codice": "Inviata",
+  "descrizione": "Inviata al Sistema di Interscambio",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.966351",
+  "name": "Inviata",
+  "spiegazione": null
+ },
+ {
+  "codice": "EC02",
+  "descrizione": "Fattura PA Respinta",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.968276",
+  "name": "EC02",
+  "spiegazione": null
+ },
+ {
+  "codice": "EC01",
+  "descrizione": "Fattura PA accettata",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.970120",
+  "name": "EC01",
+  "spiegazione": null
+ },
+ {
+  "codice": "DT",
+  "descrizione": "Notifica decorrenza termini",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.972058",
+  "name": "DT",
+  "spiegazione": null
+ },
+ {
+  "codice": "AT",
+  "descrizione": "Attestazione trasmissione con impossibilità di recapito",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.973861",
+  "name": "AT",
+  "spiegazione": null
+ },
+ {
+  "codice": "Non Inviata",
+  "descrizione": "Fattura non ancora inviata al Sistema di Interscambio",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-12-15 23:40:48.975658",
+  "name": "Non Inviata",
+  "spiegazione": null
+ }
+]

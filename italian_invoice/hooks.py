@@ -328,4 +328,7 @@ fixtures = [
 			],
 		],
 	},
+	{
+		"dt": "Stato Fattura Elettronica",
+	},
 ]
