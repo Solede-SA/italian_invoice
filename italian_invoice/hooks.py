@@ -73,8 +73,8 @@ after_install = "italian_invoice.install.after_install"
 # Uninstallation
 # ------------
 
-# before_uninstall = "italian_invoice.uninstall.before_uninstall"
-# after_uninstall = "italian_invoice.uninstall.after_uninstall"
+before_uninstall = "italian_invoice.uninstall.before_uninstall"
+after_uninstall = "italian_invoice.uninstall.after_uninstall"
 
 # Integration Setup
 # ------------------
