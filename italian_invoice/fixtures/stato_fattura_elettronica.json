@@ -1,5 +1,14 @@
 [
  {
+  "codice": "Annullata",
+  "descrizione": "Annullata",
+  "docstatus": 0,
+  "doctype": "Stato Fattura Elettronica",
+  "modified": "2025-04-08 06:22:19.785717",
+  "name": "Annullata",
+  "spiegazione": "Transazione annullata per motivi tecnici."
+ },
+ {
   "codice": "stored",
   "descrizione": "Fattura Archiviata",
   "docstatus": 0,

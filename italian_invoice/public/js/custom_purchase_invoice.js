@@ -1,3 +1,24 @@
+const updateTaxRate = (frm) => {
+  if (frm.doc.taxes && frm.doc.taxes.length > 0) {
+    frm.doc.taxes.forEach((tax) => {
+      let itemWiseTaxDetail = tax.item_wise_tax_detail;
+      if (itemWiseTaxDetail) {
+        if (typeof itemWiseTaxDetail === "string") {
+          itemWiseTaxDetail = JSON.parse(itemWiseTaxDetail);
+        }
+        Object.keys(itemWiseTaxDetail).forEach((itemCode) => {
+          let taxDetails = itemWiseTaxDetail[itemCode];
+          let taxRate = taxDetails[0];
+          let item = frm.doc.items.find(i => i.item_code === itemCode);
+          if (item) {
+            item.tax_rate = taxRate;
+          }
+        });
+      }
+    });
+  }
+};
+
 frappe.ui.form.on("Purchase Invoice", {
   refresh: (frm) => {
     if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
@@ -42,9 +63,7 @@ frappe.ui.form.on("Purchase Invoice", {
     }
   },
   custom_tipo_di_documento: (frm) => {
-    if (["TD19", "TD17"].find((x) => x == frm.doc.custom_tipo_di_documento)) {
-      frm.set_value("taxes_and_charges", "Reverse Charge");
-    } else if (frm.doc.custom_tipo_di_documento == "TD18") {
+    if (["TD17", "TD18", "TD19"].includes(frm.doc.custom_tipo_di_documento)) {
       frm.set_value("taxes_and_charges", "IVA acquisti CEE al 22%");
     } else {
       frm.set_value("taxes_and_charges", "");
@@ -52,24 +71,7 @@ frappe.ui.form.on("Purchase Invoice", {
     frm.refresh_field("taxes_and_charges");
   },
   validate: (frm) => {
-    if (frm.doc.custom_tipo_di_documento == "TD19" || frm.doc.custom_tipo_di_documento == "TD17") {
-      frm.doc.items.forEach((item) => {
-        item.tax_rate = 0;
-        if (!item.custom_motivo_esenzione_iva) {
-          frappe.throw(
-            __("Motivo esenzione IVA mancante per l'articolo {0}", [item.item_code])
-          );
-        }
-      })
-      if (frm.doc.taxes) {
-        frm.doc.taxes.forEach((tax, idx) => {
-          if (tax.base_tax_amount == 0 && (tax.custom_motivo_esenzione_iva === '' || tax.custom_motivo_esenzione_iva === undefined)) {
-            frappe.throw(__("<b>Motivo esenzione IVA</b> mancante nella tassa {0}", [idx + 1]));
-          }
-        });
-      }
-
-    }
+    updateTaxRate(frm);
   },
 });
 
