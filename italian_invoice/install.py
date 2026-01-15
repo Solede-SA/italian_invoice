@@ -217,16 +217,14 @@ def fix_erpnext_italy_duplicate_fields():
 	print(f"{'='*60}")
 	print(f"Trovati {len(fields_to_migrate)} campi problematici da migrare")
 
-	# Save data from all Customers (old field names)
+	# Save data from all Customers
+	# Note: custom_first_name/custom_last_name don't exist yet (created in after_install)
 	customers_data = {}
-	customers = frappe.get_all(
-		"Customer", fields=["name", "first_name", "last_name", "custom_first_name", "custom_last_name"]
-	)
+	customers = frappe.get_all("Customer", fields=["name", "first_name", "last_name"])
 
 	for customer in customers:
-		# Save from both old and new field names
-		first = customer.get("custom_first_name") or customer.get("first_name")
-		last = customer.get("custom_last_name") or customer.get("last_name")
+		first = customer.get("first_name")
+		last = customer.get("last_name")
 		if first or last:
 			customers_data[customer.name] = {"custom_first_name": first, "custom_last_name": last}
 
