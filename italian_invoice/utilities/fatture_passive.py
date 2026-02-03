@@ -383,7 +383,8 @@ def get_open_purchase_documents_summary(supplier_vat):
 @frappe.whitelist()
 def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sdi_name):
 	"""
-	Crea una Purchase Invoice da un Purchase Order o Purchase Receipt
+	Crea una Purchase Invoice da un Purchase Order o Purchase Receipt,
+	applicando l'IVA dalla Fattura Fornitori SDI.
 
 	Args:
 	    doc_name: Nome del PO/PR
@@ -394,6 +395,8 @@ def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sd
 	Returns:
 	    Nome della Purchase Invoice creata
 	"""
+	from italian_invoice.utilities.fatture import get_fattura_body
+
 	if doctype == "Purchase Order":
 		from erpnext.buying.doctype.purchase_order.purchase_order import (
 			make_purchase_invoice,
@@ -412,11 +415,33 @@ def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sd
 	# Imposta bill_no
 	pi.bill_no = bill_no
 
-	# Estrai data fattura dalla Fattura Fornitori SDI
+	# Estrai dati dalla Fattura Fornitori SDI
 	fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
+
+	# Estrai data fattura e allinea posting_date e bill_date
 	bill_date = _get_bill_date_from_fattura_sdi(fattura_sdi)
 	if bill_date:
 		pi.bill_date = bill_date
+		pi.posting_date = bill_date
+
+	# Estrai e applica l'IVA dalla fattura SDI
+	body = get_fattura_body(fattura_sdi.dati_fattura)
+	if body:
+		# Verifica se è una nota di credito
+		tipo_documento = (
+			body.get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento", "")
+		)
+		is_return = is_credit_note(tipo_documento)
+
+		# Estrai riepilogo IVA e prepara le tasse
+		tax_summary = extract_tax_summary(body)
+		if tax_summary:
+			# Rimuovi le tasse esistenti (copiate dal PO/PR)
+			pi.taxes = []
+			# Aggiungi le tasse dalla fattura SDI
+			taxes = prepare_invoice_taxes(tax_summary, pi.company, is_return)
+			for tax in taxes:
+				pi.append("taxes", tax)
 
 	# Salva (ma non submit)
 	pi.insert()
@@ -732,35 +757,39 @@ def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 
 def get_tax_account(tax_rate, company):
 	"""
-	Restituisce l'account IVA in base all'aliquota
+	Restituisce l'account IVA ACQUISTI in base all'aliquota.
+	Per le fatture passive (fornitori) serve sempre l'IVA a credito (Asset).
 
 	Args:
 	    tax_rate: Aliquota IVA
 	    company: Nome company
 
 	Returns:
-	    Nome dell'account IVA
+	    Nome dell'account IVA acquisti
 	"""
 	tax_rate = round(float(tax_rate), 2)
 
-	# Cerca account con quella tax_rate
-	if tax_rate > 0:
-		tax_account = frappe.db.get_all(
-			"Account",
-			{"company": company, "tax_rate": tax_rate, "account_type": "Tax"},
-			["name"],
-			limit=1,
-		)
-		if tax_account:
-			return tax_account[0]["name"]
+	# Cerca account IVA acquisti (root_type = Asset = IVA a credito)
+	tax_account = frappe.db.get_all(
+		"Account",
+		{
+			"company": company,
+			"tax_rate": tax_rate,
+			"account_type": "Tax",
+			"root_type": "Asset",
+		},
+		["name"],
+		limit=1,
+	)
 
-	# Fallback all'account IVA default della company
-	default_tax = frappe.db.get_value("Company", company, "default_income_account")
+	if tax_account:
+		return tax_account[0]["name"]
 
-	if default_tax:
-		return default_tax
-
-	frappe.throw(f"Account IVA non trovato per aliquota {tax_rate}% in {company}")
+	frappe.throw(
+		f"Account IVA Acquisti non trovato per aliquota {tax_rate}% in {company}. "
+		f"Assicurarsi che esista un account con tax_rate={tax_rate}, "
+		f"account_type='Tax' e root_type='Asset'."
+	)
 
 
 def get_or_create_item_code(line):
