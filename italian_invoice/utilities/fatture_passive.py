@@ -763,7 +763,7 @@ def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 def get_tax_account(tax_rate, company):
 	"""
 	Restituisce l'account IVA ACQUISTI in base all'aliquota.
-	Per le fatture passive (fornitori) serve sempre l'IVA a credito (Asset).
+	Cerca prima un account IVA a credito (Asset), poi uno generico (Liability).
 
 	Args:
 	    tax_rate: Aliquota IVA
@@ -774,26 +774,25 @@ def get_tax_account(tax_rate, company):
 	"""
 	tax_rate = round(float(tax_rate), 2)
 
-	# Cerca account IVA acquisti (root_type = Asset = IVA a credito)
-	tax_account = frappe.db.get_all(
-		"Account",
-		{
-			"company": company,
-			"tax_rate": tax_rate,
-			"account_type": "Tax",
-			"root_type": "Asset",
-		},
-		["name"],
-		limit=1,
-	)
-
-	if tax_account:
-		return tax_account[0]["name"]
+	# Cerca prima IVA a credito (Asset), poi IVA generica (Liability)
+	for root_type in ("Asset", "Liability"):
+		tax_account = frappe.db.get_all(
+			"Account",
+			{
+				"company": company,
+				"tax_rate": tax_rate,
+				"account_type": "Tax",
+				"root_type": root_type,
+			},
+			["name"],
+			limit=1,
+		)
+		if tax_account:
+			return tax_account[0]["name"]
 
 	frappe.throw(
 		f"Account IVA Acquisti non trovato per aliquota {tax_rate}% in {company}. "
-		f"Assicurarsi che esista un account con tax_rate={tax_rate}, "
-		f"account_type='Tax' e root_type='Asset'."
+		f"Assicurarsi che esista un account con tax_rate={tax_rate} e account_type='Tax'."
 	)
 
 
