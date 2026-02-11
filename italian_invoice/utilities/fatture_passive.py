@@ -736,6 +736,11 @@ def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 
 	for summary in invoice_summary:
 		tax_rate = float(summary.get("aliquota_iva", 0))
+
+		# Aliquota 0%: nessun importo IVA da contabilizzare (esente/non imponibile/escluso)
+		if tax_rate == 0:
+			continue
+
 		tax_account = get_tax_account(tax_rate, company)
 
 		tax_amount = invert_sign_for_credit_note(summary.get("imposta", 0), is_return)
