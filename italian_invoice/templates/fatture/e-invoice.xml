@@ -18,8 +18,8 @@
               <RiferimentoNumeroLinea>{{ loop.index }}</RiferimentoNumeroLinea>
               <IdDocumento>{{ salesOrder.po_no }}</IdDocumento>
               <Data>{{ salesOrder.po_date }}</Data>
-              {%- if salesOrder.custom_codice_commessa %}
-                  <CodiceCommessaConvenzione>#{{ salesOrder.custom_codice_commessa }}#</CodiceCommessaConvenzione>
+              {%- if salesOrder.custom_codice_endpoint %}
+                  <CodiceCommessaConvenzione>#{{ salesOrder.custom_codice_endpoint }}#</CodiceCommessaConvenzione>
               {%- endif %}
               {%- if salesOrder.custom_cig %}
                   <CodiceCIG>{{ salesOrder.custom_cig }}</CodiceCIG>
