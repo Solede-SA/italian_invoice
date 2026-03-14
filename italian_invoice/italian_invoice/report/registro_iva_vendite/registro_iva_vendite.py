@@ -215,8 +215,7 @@ def get_tax_breakdown(invoice_name):
 			account_head,
 			description,
 			rate,
-			base_tax_amount as tax_amount,
-			item_wise_tax_detail
+			base_tax_amount as tax_amount
 		FROM `tabSales Taxes and Charges`
 		WHERE parent = %s
 		ORDER BY idx
@@ -230,20 +229,8 @@ def get_tax_breakdown(invoice_name):
 		base_amount = 0
 		tax_amount = flt(tax.get("tax_amount"))
 
-		# Prova prima con item_wise_tax_detail
-		if tax.get("item_wise_tax_detail"):
-			import json
-
-			try:
-				item_wise = json.loads(tax.item_wise_tax_detail)
-				for item_code, tax_data in item_wise.items():
-					if isinstance(tax_data, list) and len(tax_data) >= 2:
-						base_amount += flt(tax_data[1])
-			except (json.JSONDecodeError, ValueError):
-				pass
-
-		# Se non c'è item_wise_tax_detail, calcola l'imponibile dalla tax_amount e rate
-		if base_amount == 0 and tax_amount != 0 and flt(tax.get("rate")) != 0:
+		# Calcola l'imponibile dalla tax_amount e rate
+		if tax_amount != 0 and flt(tax.get("rate")) != 0:
 			base_amount = tax_amount / (flt(tax.get("rate")) / 100)
 
 		# Aggiungi solo se c'è almeno un valore

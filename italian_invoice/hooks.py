@@ -331,4 +331,16 @@ fixtures = [
 	{
 		"dt": "Stato Fattura Elettronica",
 	},
+	{
+		"dt": "Desktop Icon",
+		"filters": [["app", "=", "italian_invoice"]],
+	},
+	{
+		"dt": "Workspace Sidebar",
+		"filters": [["app", "=", "italian_invoice"]],
+	},
+	{
+		"dt": "Number Card",
+		"filters": [["module", "=", "Italian Invoice"]],
+	},
 ]

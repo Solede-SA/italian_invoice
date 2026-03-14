@@ -264,6 +264,12 @@ def get_billing_address(doc, invoice):
 			as_dict=True,
 		)
 
+		if not address:
+			frappe.throw(
+				frappe._("Nessun indirizzo di fatturazione trovato per l'azienda {0}. "
+				"Configurare un Address con 'Is Primary Address' e 'Is Your Company Address' abilitati.").format(doc.name)
+			)
+
 		return address[0]
 
 

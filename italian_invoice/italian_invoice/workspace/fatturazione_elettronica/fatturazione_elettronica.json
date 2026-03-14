@@ -1,0 +1,145 @@
+{
+ "app": "italian_invoice",
+ "charts": [],
+ "content": "[{\"id\":\"nc_non_inviate\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Fatture Non Inviate\",\"col\":6}},{\"id\":\"nc_da_importare\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Fatture da Importare\",\"col\":6}},{\"id\":\"hdr_shortcuts\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"sc_si\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Invoice\",\"col\":3}},{\"id\":\"sc_pi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Invoice\",\"col\":3}},{\"id\":\"sc_tsdi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Transazione SDI\",\"col\":3}},{\"id\":\"sc_ffsdi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Fattura Fornitori SDI\",\"col\":3}},{\"id\":\"hdr_reports\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Configurazione</b></span>\",\"col\":12}},{\"id\":\"card_reports\",\"type\":\"card\",\"data\":{\"card_name\":\"Registri IVA\",\"col\":4}},{\"id\":\"card_config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configurazione\",\"col\":4}}]",
+ "creation": "2026-03-14 12:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "accounting",
+ "idx": 0,
+ "indicator_color": "",
+ "is_hidden": 0,
+ "label": "Fatturazione Elettronica",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Registri IVA",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Registro IVA Vendite",
+   "link_count": 0,
+   "link_to": "Registro IVA Vendite",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Registro IVA Acquisti",
+   "link_count": 0,
+   "link_to": "Registro IVA Acquisti",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Configurazione",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tipologia di documento e-Invoice",
+   "link_count": 0,
+   "link_to": "Tipologia di documento e-Invoice",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stato Fattura Elettronica",
+   "link_count": 0,
+   "link_to": "Stato Fattura Elettronica",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Motivo esenzione IVA",
+   "link_count": 0,
+   "link_to": "Motivo esenzione IVA",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Notifiche sistema di interscambio",
+   "link_count": 0,
+   "link_to": "Notifiche sistema di interscambio",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-03-14 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Italian Invoice",
+ "name": "Fatturazione Elettronica",
+ "number_cards": [
+  {
+   "label": "Fatture Non Inviate",
+   "number_card_name": "Fatture Non Inviate"
+  },
+  {
+   "label": "Fatture da Importare",
+   "number_card_name": "Fatture da Importare"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 0,
+ "shortcuts": [
+  {
+   "label": "Sales Invoice",
+   "link_to": "Sales Invoice",
+   "type": "DocType"
+  },
+  {
+   "label": "Purchase Invoice",
+   "link_to": "Purchase Invoice",
+   "type": "DocType"
+  },
+  {
+   "label": "Transazione SDI",
+   "link_to": "Transazione SDI",
+   "type": "DocType"
+  },
+  {
+   "label": "Fattura Fornitori SDI",
+   "link_to": "Fattura Fornitori SDI",
+   "type": "DocType"
+  }
+ ],
+ "title": "Fatturazione Elettronica",
+ "type": "Workspace"
+}
