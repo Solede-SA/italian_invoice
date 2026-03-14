@@ -169,18 +169,6 @@
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
-  },
-  {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Notifiche sistema di interscambio",
-   "link_to": "Notifiche sistema di interscambio",
-   "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link"
   }
  ],
  "modified": "2026-03-14 12:00:00.000000",

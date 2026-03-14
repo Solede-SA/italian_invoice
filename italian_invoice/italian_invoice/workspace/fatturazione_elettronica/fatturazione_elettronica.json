@@ -84,17 +84,6 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "dependencies": "",
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Notifiche sistema di interscambio",
-   "link_count": 0,
-   "link_to": "Notifiche sistema di interscambio",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
  "modified": "2026-03-14 12:00:00.000000",
