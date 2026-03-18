@@ -123,6 +123,27 @@ def create_supplier(supplier_data, company):
 
 
 @frappe.whitelist()
+def get_items_by_supplier(doctype, txt, searchfield, start, page_len, filters):
+	"""Query per ottenere Item filtrati per default_supplier dalla child table Item Default"""
+	supplier = filters.get("default_supplier")
+	if not supplier:
+		return frappe.get_list("Item", filters={"name": ["like", f"%{txt}%"]}, fields=["name", "item_name"], as_list=True, limit_start=start, limit_page_length=page_len)
+
+	return frappe.db.sql(
+		"""
+		SELECT i.name, i.item_name
+		FROM `tabItem` i
+		INNER JOIN `tabItem Default` id ON id.parent = i.name
+		WHERE id.default_supplier = %(supplier)s
+		AND (i.name LIKE %(txt)s OR i.item_name LIKE %(txt)s)
+		ORDER BY i.name
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{"supplier": supplier, "txt": f"%{txt}%", "start": int(start), "page_len": int(page_len)},
+	)
+
+
+@frappe.whitelist()
 def find_matching_items(supplier_name, invoice_lines):
 	"""
 	Cerca item matching per le righe della fattura basandosi sulla descrizione

@@ -150,6 +150,7 @@ function show_items_dialog(frm, supplier_data) {
            fieldname: `item_${idx}`,
            get_query: () => {
                return {
+                   query: 'italian_invoice.utilities.fatture_passive.get_items_by_supplier',
                    filters: {
                        'default_supplier': supplier_data.name
                    }
