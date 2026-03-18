@@ -105,8 +105,9 @@ Perfetto per test senza dipendenze esterne:
 Per invio automatico al SDI:
 
 ```bash
-bench get-app openapi
+bench get-app https://github.com/Solede-SA/openapi.git
 bench --site [nome-sito] install-app openapi
+bench --site [nome-sito] migrate
 ```
 
 Poi imposta Provider SDI = "OpenAPI" in Company.
