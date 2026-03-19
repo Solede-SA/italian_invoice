@@ -97,7 +97,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-03-19 17:26:23.890852",
+ "modified": "2026-03-19 18:22:06.364507",
  "modified_by": "Administrator",
  "module": "Italian Invoice",
  "name": "Fatturazione Elettronica",
@@ -121,17 +121,17 @@
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Da inviare al SDI",
+   "label": "Scartate",
    "link_to": "Sales Invoice",
-   "stats_filter": "[[\"Sales Invoice\",\"custom_stato_invio\",\"=\",\"Non Inviata\"]]",
+   "stats_filter": "[[\"Sales Invoice\",\"custom_stato_invio\",\"=\",\"NS\"]]",
    "type": "DocType"
   },
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Scartate",
+   "label": "Da inviare al SDI",
    "link_to": "Sales Invoice",
-   "stats_filter": "[[\"Sales Invoice\",\"custom_stato_invio\",\"=\",\"NS\"]]",
+   "stats_filter": "[[\"Sales Invoice\",\"custom_stato_invio\",\"=\",\"Non Inviata\"],[\"Sales Invoice\",\"status\",\"!=\",\"Cancelled\"]]",
    "type": "DocType"
   },
   {
