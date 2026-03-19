@@ -474,7 +474,7 @@ def get_invoice_data(doc):
 		transmission_format_code = "FPA12"
 
 	vat_collectability = doc.vat_collectability.split("-")[0] if hasattr(doc, "vat_collectability") else "I"
-	tax_data = get_invoice_summary(e_invoice_items, doc.taxes)
+	tax_data = get_invoice_summary(e_invoice_items, doc.taxes, doc)
 
 	conversion_rate = doc.conversion_rate if hasattr(doc, "conversion_rate") else 1
 
@@ -671,10 +671,7 @@ def get_invoice_data(doc):
 #     zip_stream.close()
 
 
-def get_invoice_summary(items, taxes):
-	for item in items:
-		print("item.tax_rate", item.tax_rate)
-
+def get_invoice_summary(items, taxes, doc=None):
 	summary_data = frappe._dict()
 	for tax in taxes:
 		# Include only VAT charges.
@@ -753,18 +750,23 @@ def get_invoice_summary(items, taxes):
 				add_deduct_tax = tax.add_deduct_tax
 
 			if add_deduct_tax == "Add":
-				item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
-				print("item_wise_tax_detail", item_wise_tax_detail)
-				for rate_item in [
-					tax_item for tax_item in item_wise_tax_detail.items() if tax_item[1][0] == tax.rate
-				]:
+				# Get item-wise tax details from child table (ERPNext v16+)
+				tax_detail_rows = []
+				if doc:
+					tax_detail_rows = [
+						row for row in doc.get("item_wise_tax_details", [])
+						if row.tax_row == tax.name and row.rate == tax.rate
+					]
+
+				if not tax_detail_rows:
+					frappe.throw(f"La riga tasse '{tax.description}' non ha il dettaglio per item. Salvare la fattura prima di validare.")
+
+				for detail_row in tax_detail_rows:
 					key = cstr(tax.rate)
 					if not summary_data.get(key):
 						summary_data.setdefault(key, {"tax_amount": 0.0, "taxable_amount": 0.0})
-					summary_data[key]["tax_amount"] += rate_item[1][1]
-					summary_data[key]["taxable_amount"] += sum(
-						[item.net_amount for item in items if item.item_code == rate_item[0]]
-					)
+					summary_data[key]["tax_amount"] += detail_row.amount
+					summary_data[key]["taxable_amount"] += detail_row.taxable_amount
 
 				for item in items:
 					key = cstr(tax.rate)
@@ -773,7 +775,6 @@ def get_invoice_summary(items, taxes):
 							summary_data.setdefault(key, {"taxable_amount": 0.0})
 						summary_data[key]["taxable_amount"] += item.taxable_amount
 
-	print("summary_data", summary_data)
 	return summary_data
 
 

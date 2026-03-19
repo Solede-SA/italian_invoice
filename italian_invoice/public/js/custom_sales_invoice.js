@@ -52,22 +52,14 @@ const getCustomerTipoFatturaElettronica = (frm) => {
 }
 
 const updateTaxRate = (frm) => {
-  console.log("frm.doc.taxes", frm.doc.taxes);
-  if (frm.doc.taxes.length > 0) {
-    frm.doc.taxes.forEach((tax, idx) => {
-      console.log("tax", tax);
-      console.log("tax.item_wise_tax_detail", tax.item_wise_tax_detail);
-      let itemWiseTaxDetail = tax.item_wise_tax_detail;
-      Object.keys(itemWiseTaxDetail).forEach((itemCode) => {
-        let taxDetails = itemWiseTaxDetail[itemCode];
-        let taxRate = taxDetails[0]; // First value in the array is the tax rate
-        let item = frm.doc.items.find(i => i.item_code === itemCode);
-        if (item) {
-          item.tax_rate = taxRate;
-        }
-      })
-    });
-  }
+  // ERPNext v16: use item_wise_tax_details child table instead of tax.item_wise_tax_detail
+  const taxDetails = frm.doc.item_wise_tax_details || [];
+  taxDetails.forEach((row) => {
+    const itemRow = frm.doc.items.find(i => i.name === row.item_row);
+    if (itemRow) {
+      itemRow.tax_rate = row.rate;
+    }
+  });
 }
 
 const setTaxesAndCharges = (frm) => {
