@@ -1,8 +1,8 @@
 {
  "app": "italian_invoice",
  "charts": [],
- "content": "[{\"id\":\"nc_non_inviate\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Fatture Non Inviate\",\"col\":6}},{\"id\":\"nc_da_importare\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Fatture da Importare\",\"col\":6}},{\"id\":\"hdr_shortcuts\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"sc_si\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Invoice\",\"col\":3}},{\"id\":\"sc_pi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Invoice\",\"col\":3}},{\"id\":\"sc_tsdi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Transazione SDI\",\"col\":3}},{\"id\":\"sc_ffsdi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Fattura Fornitori SDI\",\"col\":3}},{\"id\":\"hdr_reports\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Configurazione</b></span>\",\"col\":12}},{\"id\":\"card_reports\",\"type\":\"card\",\"data\":{\"card_name\":\"Registri IVA\",\"col\":4}},{\"id\":\"card_config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configurazione\",\"col\":4}}]",
- "creation": "2026-03-14 12:00:00.000000",
+ "content": "[{\"id\":\"sZ3BJZ_Ndy\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Fatture</b></span>\",\"col\":12}},{\"id\":\"J-nsWJZFLv\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Draft\",\"col\":3}},{\"id\":\"W1_llIp0k3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Da inviare al SDI\",\"col\":3}},{\"id\":\"g8UZuNDkdm\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Scartate\",\"col\":3}},{\"id\":\"7Hzz0HmBAP\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Non pagate\",\"col\":3}},{\"id\":\"hdr_shortcuts\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"sc_si\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Invoice\",\"col\":3}},{\"id\":\"sc_pi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Invoice\",\"col\":3}},{\"id\":\"sc_tsdi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Transazione SDI\",\"col\":3}},{\"id\":\"sc_ffsdi\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Fattura Fornitori SDI\",\"col\":3}},{\"id\":\"hdr_reports\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Configurazione</b></span>\",\"col\":12}},{\"id\":\"card_reports\",\"type\":\"card\",\"data\":{\"card_name\":\"Registri IVA\",\"col\":4}},{\"id\":\"card_config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configurazione\",\"col\":4}}]",
+ "creation": "2026-03-14 12:00:00",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -84,33 +84,67 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Notifiche sistema di interscambio",
+   "link_count": 0,
+   "link_to": "Notifiche sistema di interscambio",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-03-14 12:00:00.000000",
+ "modified": "2026-03-19 17:26:23.890852",
  "modified_by": "Administrator",
  "module": "Italian Invoice",
  "name": "Fatturazione Elettronica",
- "number_cards": [
-  {
-   "label": "Fatture Non Inviate",
-   "number_card_name": "Fatture Non Inviate"
-  },
-  {
-   "label": "Fatture da Importare",
-   "number_card_name": "Fatture da Importare"
-  }
- ],
+ "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
  "restrict_to_domain": "",
  "roles": [],
- "sequence_id": 0,
+ "sequence_id": 0.0,
  "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Draft",
+   "link_to": "Sales Invoice",
+   "stats_filter": "[[\"Sales Invoice\",\"status\",\"=\",\"Draft\"]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Da inviare al SDI",
+   "link_to": "Sales Invoice",
+   "stats_filter": "[[\"Sales Invoice\",\"custom_stato_invio\",\"=\",\"Non Inviata\"]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Scartate",
+   "link_to": "Sales Invoice",
+   "stats_filter": "[[\"Sales Invoice\",\"custom_stato_invio\",\"=\",\"NS\"]]",
+   "type": "DocType"
+  },
   {
    "label": "Sales Invoice",
    "link_to": "Sales Invoice",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Non pagate",
+   "link_to": "Sales Invoice",
+   "stats_filter": "[[\"Sales Invoice\",\"status\",\"in\",[\"Partly Paid\",\"Overdue\",\"Unpaid\",null]]]",
    "type": "DocType"
   },
   {

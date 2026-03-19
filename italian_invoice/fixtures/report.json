@@ -23,15 +23,9 @@
   "report_type": "Custom Report",
   "roles": [
    {
-    "parent": "Registro IVA",
-    "parentfield": "roles",
-    "parenttype": "Report",
     "role": "Accounts User"
    },
    {
-    "parent": "Registro IVA",
-    "parentfield": "roles",
-    "parenttype": "Report",
     "role": "Accounts Manager"
    }
   ],
