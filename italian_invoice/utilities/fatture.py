@@ -129,6 +129,13 @@ def get_value_from_json_paths(dati_fattura, paths):
 
 def get_invoice_payload(invoice_data):
 	"""Estrae il payload della fattura dal JSON"""
+	if isinstance(invoice_data, str):
+		invoice_data = json.loads(invoice_data)
+
+	# Se i dati sono già il payload (fattura_elettronica_header al top level)
+	if isinstance(invoice_data, dict) and "fattura_elettronica_header" in invoice_data:
+		return invoice_data
+
 	result = get_value_from_json_paths(invoice_data, JSON_PATHS["payload"])
 	if not result:
 		frappe.throw("Impossibile estrarre il payload dalla struttura JSON")
@@ -137,6 +144,14 @@ def get_invoice_payload(invoice_data):
 
 def get_fattura_body(invoice_data):
 	"""Estrae il fattura_elettronica_body dal JSON"""
+	if isinstance(invoice_data, str):
+		invoice_data = json.loads(invoice_data)
+
+	# Se i dati hanno fattura_elettronica_body al top level
+	if isinstance(invoice_data, dict) and "fattura_elettronica_body" in invoice_data:
+		body = invoice_data["fattura_elettronica_body"]
+		return body[0] if isinstance(body, list) and len(body) > 0 else body
+
 	result = get_value_from_json_paths(invoice_data, JSON_PATHS["fattura_body"])
 	if not result:
 		frappe.throw("Impossibile estrarre il body dalla struttura JSON")
@@ -199,6 +214,28 @@ def get_invoice_lines_from_json(invoice_data):
 		frappe.throw("Nessuna linea fattura trovata nel JSON")
 
 	return lines
+
+
+def get_codice_articolo_from_line(line):
+	"""
+	Estrae il codice articolo fornitore dalla riga fattura.
+	Nel FatturaPA il campo codice_articolo è un array:
+	[{"tipo_codice": "FORNITORE", "codice_valore": "ABC123"}]
+
+	Returns:
+	    Il primo codice_valore trovato, o None
+	"""
+	codice_articolo = line.get("codice_articolo")
+	if not codice_articolo:
+		return None
+
+	if isinstance(codice_articolo, list) and len(codice_articolo) > 0:
+		return codice_articolo[0].get("codice_valore")
+
+	if isinstance(codice_articolo, dict):
+		return codice_articolo.get("codice_valore")
+
+	return None
 
 
 def get_invoice_total_from_json(invoice_data):
@@ -1039,14 +1076,7 @@ def identify_company_from_webhook_data(data):
 	print(f"Event type: {event_type}")
 
 	def get_nested_value(obj, path):
-		"""Naviga un percorso nel JSON"""
-		current = obj
-		for key in path:
-			if isinstance(current, dict) and key in current:
-				current = current[key]
-			else:
-				return None
-		return current
+		return get_value_from_json_paths(obj, [path])
 
 	# Controlla se è un'autofattura (TD17-TD19 o altro tipo specifico)
 	tipo_documento = None

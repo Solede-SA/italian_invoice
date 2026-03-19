@@ -118,25 +118,34 @@ def create_supplier(supplier_data, company):
 			supplier.fiscal_code = cf
 
 	supplier.insert()
-	supplier.save()
 	return supplier.name
 
 
 @frappe.whitelist()
 def get_items_by_supplier(doctype, txt, searchfield, start, page_len, filters):
-	"""Query per ottenere Item filtrati per default_supplier dalla child table Item Default"""
+	"""Query per ottenere tutti gli Item, prioritizzando quelli associati al fornitore
+	tramite Item Supplier o Item Default."""
 	supplier = filters.get("default_supplier")
 	if not supplier:
-		return frappe.get_list("Item", filters={"name": ["like", f"%{txt}%"]}, fields=["name", "item_name"], as_list=True, limit_start=start, limit_page_length=page_len)
+		return frappe.get_list(
+			"Item",
+			filters={"name": ["like", f"%{txt}%"]},
+			fields=["name", "item_name"],
+			as_list=True,
+			limit_start=start,
+			limit_page_length=page_len,
+		)
 
 	return frappe.db.sql(
 		"""
 		SELECT i.name, i.item_name
 		FROM `tabItem` i
-		INNER JOIN `tabItem Default` id ON id.parent = i.name
-		WHERE id.default_supplier = %(supplier)s
-		AND (i.name LIKE %(txt)s OR i.item_name LIKE %(txt)s)
-		ORDER BY i.name
+		LEFT JOIN `tabItem Supplier` isup ON isup.parent = i.name AND isup.supplier = %(supplier)s
+		LEFT JOIN `tabItem Default` idef ON idef.parent = i.name AND idef.default_supplier = %(supplier)s
+		WHERE (i.name LIKE %(txt)s OR i.item_name LIKE %(txt)s)
+		AND i.disabled = 0
+		GROUP BY i.name
+		ORDER BY (isup.name IS NOT NULL OR idef.name IS NOT NULL) DESC, i.name
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{"supplier": supplier, "txt": f"%{txt}%", "start": int(start), "page_len": int(page_len)},
@@ -144,13 +153,78 @@ def get_items_by_supplier(doctype, txt, searchfield, start, page_len, filters):
 
 
 @frappe.whitelist()
+def save_item_supplier_mappings(mappings, supplier_name):
+	"""
+	Salva le associazioni fornitore-articolo nella child table Item Supplier.
+	Chiamata dopo che l'utente conferma il dialog con 'Ricorda associazione'.
+	"""
+	if isinstance(mappings, str):
+		mappings = json.loads(mappings)
+
+	# Filtra mappings validi e raccogli item_code unici
+	valid = [(m["item_code"], m["supplier_part_no"]) for m in mappings if m.get("item_code") and m.get("supplier_part_no")]
+	if not valid:
+		return
+
+	item_codes = list(set(ic for ic, _ in valid))
+
+	# Bulk check: trova tutte le associazioni già esistenti per questi item e fornitore
+	existing_keys = set()
+	for row in frappe.get_all(
+		"Item Supplier",
+		filters={"parent": ["in", item_codes], "supplier": supplier_name},
+		fields=["parent", "supplier_part_no"],
+	):
+		existing_keys.add((row["parent"], (row["supplier_part_no"] or "").strip().lower()))
+
+	# Raggruppa per item_code per caricare ogni Item una volta sola
+	from collections import defaultdict
+	items_to_update = defaultdict(list)
+	for item_code, part_no in valid:
+		if (item_code, part_no.strip().lower()) not in existing_keys:
+			items_to_update[item_code].append(part_no)
+
+	for item_code, part_nos in items_to_update.items():
+		item_doc = frappe.get_doc("Item", item_code)
+		for part_no in part_nos:
+			item_doc.append("supplier_items", {
+				"supplier": supplier_name,
+				"supplier_part_no": part_no,
+			})
+		item_doc.save(ignore_permissions=True)
+
+
+def _get_supplier_items(supplier_name):
+	"""Ottieni tutti gli Item associati al fornitore (via Item Supplier + Item Default)."""
+	# Item da Item Supplier
+	from_supplier = frappe.get_all(
+		"Item Supplier",
+		filters={"supplier": supplier_name},
+		fields=["parent as item_code", "supplier_part_no"],
+	)
+
+	# Item da Item Default
+	from_default = frappe.get_all(
+		"Item Default",
+		filters={"default_supplier": supplier_name},
+		fields=["parent as item_code"],
+	)
+
+	return from_supplier, from_default
+
+
+@frappe.whitelist()
 def find_matching_items(supplier_name, invoice_lines):
 	"""
-	Cerca item matching per le righe della fattura basandosi sulla descrizione
+	Cerca item matching per le righe della fattura con strategia a cascata:
+	1. codice_articolo XML → Item Supplier.supplier_part_no
+	2. descrizione → Item Supplier.supplier_part_no (match esatto)
+	3. SequenceMatcher su item_name/description degli Item del fornitore
+	4. Nessun match → lascia vuoto
 
 	Args:
 	    supplier_name: Nome del fornitore
-	    invoice_lines: Lista di righe fattura con numero_linea e descrizione
+	    invoice_lines: Lista di righe fattura
 
 	Returns:
 	    dict: {numero_linea: {"item_code": "...", "expense_account": "..."}}
@@ -158,75 +232,94 @@ def find_matching_items(supplier_name, invoice_lines):
 	if isinstance(invoice_lines, str):
 		invoice_lines = json.loads(invoice_lines)
 
+	from italian_invoice.utilities.fatture import get_codice_articolo_from_line
+
 	matches = {}
+	from_supplier, from_default = _get_supplier_items(supplier_name)
 
-	# Ottieni tutti gli item del fornitore
-	items = frappe.get_all(
-		"Item Default",
-		filters={"default_supplier": supplier_name},
-		fields=["parent as item_code"],
-	)
+	# Indice supplier_part_no → item_code per lookup rapido
+	part_no_map = {}
+	for entry in from_supplier:
+		pn = (entry.get("supplier_part_no") or "").strip().lower()
+		if pn:
+			part_no_map[pn] = entry["item_code"]
 
-	if not items:
-		return matches
+	# Tutti gli item_code del fornitore (da entrambe le fonti)
+	all_item_codes = list(set(
+		[e["item_code"] for e in from_supplier] + [e["item_code"] for e in from_default]
+	))
 
-	item_codes = [item["item_code"] for item in items]
-
-	# Ottieni dettagli degli item
-	items_details = frappe.get_all(
-		"Item",
-		filters={"name": ["in", item_codes]},
-		fields=["name", "item_name", "description"],
-	)
+	# Dettagli degli item per il matching per similarità
+	items_details = []
+	# Bulk fetch expense accounts per tutti gli item del fornitore
+	expense_accounts = {}
+	if all_item_codes:
+		items_details = frappe.get_all(
+			"Item",
+			filters={"name": ["in", all_item_codes]},
+			fields=["name", "item_name", "description"],
+		)
+		for row in frappe.get_all(
+			"Item Default",
+			filters={"parent": ["in", all_item_codes]},
+			fields=["parent", "default_supplier", "expense_account"],
+		):
+			if not row.get("expense_account"):
+				continue
+			# Priorità: account specifico per questo fornitore
+			if row["default_supplier"] == supplier_name:
+				expense_accounts[row["parent"]] = row["expense_account"]
+			elif row["parent"] not in expense_accounts:
+				expense_accounts[row["parent"]] = row["expense_account"]
 
 	for line in invoice_lines:
-		line_desc = (line.get("descrizione") or "").strip().lower()
-		if not line_desc:
-			continue
+		line_desc = (line.get("descrizione") or "").strip()
+		line_desc_lower = line_desc.lower()
+		codice = get_codice_articolo_from_line(line)
+		matched_item = None
 
-		best_match = None
-		best_ratio = 0.0
+		# 1. Match per codice articolo XML → supplier_part_no
+		if codice:
+			codice_lower = codice.strip().lower()
+			if codice_lower in part_no_map:
+				matched_item = part_no_map[codice_lower]
 
-		for item in items_details:
-			# Confronta con item_name
-			item_name = (item.get("item_name") or "").strip().lower()
-			if item_name:
-				ratio = SequenceMatcher(None, line_desc, item_name).ratio()
-				if ratio > best_ratio and ratio > 0.7:  # Soglia 70% similarità
-					best_ratio = ratio
-					best_match = item["name"]
+		# 2. Match esatto descrizione → supplier_part_no
+		if not matched_item and line_desc_lower:
+			if line_desc_lower in part_no_map:
+				matched_item = part_no_map[line_desc_lower]
 
-			# Confronta anche con description se presente
-			item_desc = (item.get("description") or "").strip().lower()
-			if item_desc:
-				ratio = SequenceMatcher(None, line_desc, item_desc).ratio()
-				if ratio > best_ratio and ratio > 0.7:
-					best_ratio = ratio
-					best_match = item["name"]
+		# 3. Match per similarità su item_name/description
+		if not matched_item and line_desc_lower and items_details:
+			best_ratio = 0.0
+			for item in items_details:
+				for field in ("item_name", "description"):
+					val = (item.get(field) or "").strip().lower()
+					if not val:
+						continue
+					if line_desc_lower == val:
+						matched_item = item["name"]
+						break
+					ratio = SequenceMatcher(None, line_desc_lower, val).ratio()
+					if ratio > best_ratio and ratio > 0.7:
+						best_ratio = ratio
+						matched_item = item["name"]
+				if matched_item and line_desc_lower == (item.get("item_name") or "").strip().lower():
+					break
 
-			# Exact match ha priorità
-			if line_desc == item_name or line_desc == item_desc:
-				best_match = item["name"]
-				break
-
-		if best_match:
-			# Recupera anche il conto di costo
-			expense_account = frappe.db.get_value(
-				"Item Default",
-				{"parent": best_match, "default_supplier": supplier_name},
-				"expense_account",
-			)
-
+		if matched_item:
 			matches[line.get("numero_linea")] = {
-				"item_code": best_match,
-				"expense_account": expense_account,
+				"item_code": matched_item,
+				"expense_account": expense_accounts.get(matched_item),
 			}
 
 	return matches
 
 
 @frappe.whitelist()
-def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mappings=None):
+def process_supplier_invoice(
+	invoice_data, fattura_fornitori_sdi=None, item_mappings=None, remember_mappings=None
+):
 	"""
 	Processa una fattura fornitore e crea una Purchase Invoice
 
@@ -234,19 +327,21 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
 	    invoice_data: JSON string o dict con dati fattura
 	    fattura_fornitori_sdi: Nome doc Fattura Fornitori SDI (opzionale)
 	    item_mappings: Mapping articoli personalizzato (opzionale)
+	    remember_mappings: Lista di {item_code, supplier_part_no} da salvare in Item Supplier
 
 	Returns:
 	    Nome della Purchase Invoice creata
 	"""
 	try:
-		frappe.db.begin()
-
 		# Parse dati se necessario
 		if isinstance(invoice_data, str):
 			invoice_data = json.loads(invoice_data)
 
 		if item_mappings and isinstance(item_mappings, str):
 			item_mappings = json.loads(item_mappings)
+
+		if remember_mappings and isinstance(remember_mappings, str):
+			remember_mappings = json.loads(remember_mappings)
 
 		# Estrai dati fattura
 		from italian_invoice.utilities.fatture import (
@@ -307,7 +402,6 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
 			purchase_invoice.scan_field = invoice_data["data"]["invoice"]["file_id"]
 
 		purchase_invoice.insert()
-		purchase_invoice.save()
 
 		# Aggiorna Fattura Fornitori SDI se presente
 		if fattura_fornitori_sdi:
@@ -315,11 +409,13 @@ def process_supplier_invoice(invoice_data, fattura_fornitori_sdi=None, item_mapp
 			fattura_sdi_doc.stato = "Importata"
 			fattura_sdi_doc.save()
 
-		frappe.db.commit()
+		# Salva associazioni Item Supplier per auto-apprendimento
+		if remember_mappings:
+			save_item_supplier_mappings(remember_mappings, supplier)
+
 		return purchase_invoice.name
 
 	except Exception as e:
-		frappe.db.rollback()
 		frappe.log_error(f"Errore importazione: {str(e)}", "Italian Invoice Passive")
 		frappe.throw(f"Errore importazione fattura: {str(e)}")
 
@@ -605,34 +701,38 @@ def on_purchase_invoice_cancel(doc, method):
 	unlink_purchase_invoice_from_fattura_sdi(doc.name)
 
 
+def _extract_from_payload(payload, body_path, default=None):
+	"""Helper DRY per estrarre dati dal payload navigando la struttura a cascata."""
+	if default is None:
+		default = {}
+	if "fattura_elettronica_body" in payload:
+		obj = payload["fattura_elettronica_body"][0]
+		for key in body_path:
+			obj = obj[key]
+		return obj
+	# Naviga il percorso diretto (senza fattura_elettronica_body)
+	obj = payload
+	for key in body_path[:-1]:
+		if key in obj:
+			obj = obj[key]
+		else:
+			return payload.get(body_path[-1], default)
+	return obj.get(body_path[-1], default)
+
+
 def extract_document_data(payload):
 	"""Estrae dati generali documento"""
-	if "fattura_elettronica_body" in payload:
-		return payload["fattura_elettronica_body"][0]["dati_generali"]["dati_generali_documento"]
-	elif "dati_generali" in payload:
-		return payload["dati_generali"]["dati_generali_documento"]
-	else:
-		return payload.get("dati_generali_documento", {})
+	return _extract_from_payload(payload, ["dati_generali", "dati_generali_documento"])
 
 
 def extract_invoice_lines(payload):
 	"""Estrae righe fattura"""
-	if "fattura_elettronica_body" in payload:
-		return payload["fattura_elettronica_body"][0]["dati_beni_servizi"]["dettaglio_linee"]
-	elif "dati_beni_servizi" in payload:
-		return payload["dati_beni_servizi"]["dettaglio_linee"]
-	else:
-		return payload.get("dettaglio_linee", [])
+	return _extract_from_payload(payload, ["dati_beni_servizi", "dettaglio_linee"], default=[])
 
 
 def extract_tax_summary(payload):
 	"""Estrae riepilogo IVA"""
-	if "fattura_elettronica_body" in payload:
-		return payload["fattura_elettronica_body"][0]["dati_beni_servizi"]["dati_riepilogo"]
-	elif "dati_beni_servizi" in payload:
-		return payload["dati_beni_servizi"]["dati_riepilogo"]
-	else:
-		return payload.get("dati_riepilogo", [])
+	return _extract_from_payload(payload, ["dati_beni_servizi", "dati_riepilogo"], default=[])
 
 
 def calculate_total_discount(invoice_lines):
@@ -743,12 +843,14 @@ def get_line_quantity(line):
 
 def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 	"""
-	Prepara le tasse per la fattura di acquisto
+	Prepara le tasse per la fattura di acquisto.
+	Gestisce sia aliquote standard che righe con IVA 0% + natura (N1-N6).
+	Per reverse charge (N6) crea doppia riga: IVA credito + IVA debito.
 
 	Args:
-	    invoice_summary: Lista di riepiloghi IVA
+	    invoice_summary: Lista di riepiloghi IVA (dati_riepilogo)
 	    company: Nome della società
-	    is_return: True se è una nota di credito (inverte i segni)
+	    is_return: True se è una nota di credito
 
 	Returns:
 	    Lista di dizionari per le tasse
@@ -757,53 +859,108 @@ def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 
 	for summary in invoice_summary:
 		tax_rate = float(summary.get("aliquota_iva", 0))
-
-		# Aliquota 0%: nessun importo IVA da contabilizzare (esente/non imponibile/escluso)
-		if tax_rate == 0:
-			continue
-
-		tax_account = get_tax_account(tax_rate, company)
+		natura = summary.get("natura") or ""
+		esigibilita = summary.get("esigibilita_iva") or "I"
+		rif_normativo = summary.get("riferimento_normativo") or ""
 
 		tax_amount = invert_sign_for_credit_note(summary.get("imposta", 0), is_return)
 		total = invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return)
 
-		taxes.append(
-			{
+		if tax_rate == 0 and natura:
+			# IVA 0% con natura: crea riga tax con importo 0 e conto specifico
+			tax_account = get_tax_account_by_natura(natura, company)
+			description = rif_normativo or f"Natura {natura}"
+
+			taxes.append({
+				"charge_type": "Actual",
+				"account_head": tax_account,
+				"tax_amount": 0,
+				"rate": 0,
+				"description": description,
+				"total": total,
+			})
+
+			# Reverse charge (N6.x): crea anche riga IVA a debito speculare
+			if natura.startswith("N6"):
+				rc_tax_rate = _get_reverse_charge_rate(natura)
+				if rc_tax_rate > 0:
+					rc_credit_account = get_tax_account(rc_tax_rate, company, root_type="Asset")
+					rc_debit_account = get_tax_account(rc_tax_rate, company, root_type="Liability")
+					rc_amount = round(float(total) * rc_tax_rate / 100, 2)
+					rc_amount = invert_sign_for_credit_note(rc_amount, is_return)
+
+					taxes.append({
+						"charge_type": "Actual",
+						"account_head": rc_credit_account,
+						"tax_amount": rc_amount,
+						"rate": rc_tax_rate,
+						"description": f"IVA {rc_tax_rate}% RC credito ({natura})",
+						"total": total,
+					})
+					taxes.append({
+						"charge_type": "Actual",
+						"account_head": rc_debit_account,
+						"tax_amount": -rc_amount,
+						"rate": rc_tax_rate,
+						"description": f"IVA {rc_tax_rate}% RC debito ({natura})",
+						"total": total,
+					})
+		elif tax_rate == 0:
+			# IVA 0% senza natura: ignora (non è significativo)
+			continue
+		else:
+			# Aliquota standard (22%, 10%, 4%, ecc.)
+			tax_account = get_tax_account(tax_rate, company)
+
+			description = f"IVA {tax_rate}%"
+			if esigibilita == "S":
+				description += " (Split Payment)"
+			elif esigibilita == "D":
+				description += " (Differita)"
+
+			taxes.append({
 				"charge_type": "Actual",
 				"account_head": tax_account,
 				"tax_amount": tax_amount,
 				"rate": tax_rate,
-				"description": f"IVA {tax_rate}%",
+				"description": description,
 				"total": total,
-			}
-		)
+			})
 
 	return taxes
 
 
-def get_tax_account(tax_rate, company):
+def _get_reverse_charge_rate(natura):
+	"""Determina l'aliquota IVA per reverse charge in base alla natura."""
+	# N6.1-N6.9: in Italia l'aliquota standard per RC è 22%
+	# Può essere personalizzata in futuro
+	return 22.0
+
+
+def get_tax_account(tax_rate, company, root_type=None):
 	"""
 	Restituisce l'account IVA ACQUISTI in base all'aliquota.
-	Cerca prima un account IVA a credito (Asset), poi uno generico (Liability).
 
 	Args:
 	    tax_rate: Aliquota IVA
 	    company: Nome company
+	    root_type: Se specificato, cerca solo in quel root_type
 
 	Returns:
 	    Nome dell'account IVA acquisti
 	"""
 	tax_rate = round(float(tax_rate), 2)
 
-	# Cerca prima IVA a credito (Asset), poi IVA generica (Liability)
-	for root_type in ("Asset", "Liability"):
+	root_types = [root_type] if root_type else ["Asset", "Liability"]
+
+	for rt in root_types:
 		tax_account = frappe.db.get_all(
 			"Account",
 			{
 				"company": company,
 				"tax_rate": tax_rate,
 				"account_type": "Tax",
-				"root_type": root_type,
+				"root_type": rt,
 			},
 			["name"],
 			limit=1,
@@ -812,8 +969,44 @@ def get_tax_account(tax_rate, company):
 			return tax_account[0]["name"]
 
 	frappe.throw(
-		f"Account IVA Acquisti non trovato per aliquota {tax_rate}% in {company}. "
+		f"Account IVA Acquisti non trovato per aliquota {tax_rate}% (root_type={root_type or 'Asset/Liability'}) in {company}. "
 		f"Assicurarsi che esista un account con tax_rate={tax_rate} e account_type='Tax'."
+	)
+
+
+def get_tax_account_by_natura(natura, company):
+	"""
+	Restituisce l'account contabile per operazioni con natura (IVA 0%).
+	Cerca un Account con account_name che contenga il codice natura.
+
+	Args:
+	    natura: Codice natura (N1, N2.2, N3.5, N4, N6.1, ecc.)
+	    company: Nome company
+
+	Returns:
+	    Nome dell'account
+	"""
+	# Cerca account con nome che contiene il codice natura (es. "N4" o "N6")
+	natura_base = natura.split(".")[0] if "." in natura else natura
+
+	for search_term in (natura, natura_base):
+		accounts = frappe.db.get_all(
+			"Account",
+			{
+				"company": company,
+				"account_name": ["like", f"%{search_term}%"],
+				"account_type": "Tax",
+				"is_group": 0,
+			},
+			["name"],
+			limit=1,
+		)
+		if accounts:
+			return accounts[0]["name"]
+
+	frappe.throw(
+		f"Account non trovato per natura '{natura}' in {company}. "
+		f"Creare un account di tipo Tax con il codice natura nel nome (es. 'IVA Acquisti {natura}')."
 	)
 
 

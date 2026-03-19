@@ -1,8 +1,8 @@
 # Italian Invoice
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Frappe](https://img.shields.io/badge/Frappe-v15+-blue.svg)](https://frappeframework.com)
-[![ERPNext](https://img.shields.io/badge/ERPNext-v15+-green.svg)](https://erpnext.com)
+[![Frappe](https://img.shields.io/badge/Frappe-v16-blue.svg)](https://frappeframework.com)
+[![ERPNext](https://img.shields.io/badge/ERPNext-v16-green.svg)](https://erpnext.com)
 
 App Frappe/ERPNext per la gestione della **Fatturazione Elettronica Italiana** conforme allo standard **FatturaPA** e al **Sistema di Interscambio (SDI)**.
 
@@ -12,12 +12,15 @@ App Frappe/ERPNext per la gestione della **Fatturazione Elettronica Italiana** c
 - ✅ Validazione XML multi-livello con messaggi user-friendly
 - ✅ Import automatico fatture fornitori via webhook o upload
 - ✅ Auto-link intelligente fatture passive con Purchase Orders/Receipts
+- ✅ Auto-apprendimento associazioni articoli fornitore (Item Supplier)
+- ✅ Matching articoli a cascata: codice articolo XML, descrizione memorizzata, similarità
+- ✅ Gestione IVA completa: aliquote standard, natura (N1-N6), reverse charge (N6), esigibilità (I/D/S)
+- ✅ Dialog importazione split left/right stile Facile Manager
 - ✅ Arrotondamento pagamenti automatico con audit trail
 - ✅ Registri IVA vendite/acquisti conformi normativa italiana
 - ✅ Architettura provider pluggabile per diversi servizi SDI
 - ✅ Provider Manual built-in (zero dipendenze esterne)
 - ✅ Supporto Split Payment, Lettera d'Intento, Nature IVA (N1-N7)
-- ✅ ~4,700 linee di codice Python production-ready
 
 ## 📦 Installazione
 
@@ -32,7 +35,7 @@ bench --site [nome-sito] install-app italian_invoice
 bench --site [nome-sito] migrate
 ```
 
-**Requisiti**: Frappe v15+, ERPNext v15+, Python 3.10+
+**Requisiti**: Frappe v16, ERPNext v16, Python 3.10+
 
 ## 🔧 Configurazione Rapida
 
@@ -66,11 +69,19 @@ Per ogni cliente/fornitore aggiungi:
 
 ### Fatturazione Passiva
 
-#### Importazione Manuale
-1. Vai in **Fattura Fornitori SDI** → Nuovo
-2. Carica il file XML della fattura
-3. Il sistema estrae automaticamente dati fornitore e righe
-4. Clicca **"Importa Fattura"** per creare Purchase Invoice
+#### Importazione con Associazione Articoli
+1. Vai in **Fattura Fornitori SDI** → apri una fattura "Da importare"
+2. Clicca **"Importa Fattura"** → si apre il dialog split left/right
+3. A sinistra: dati fattura (descrizione, importo, IVA, codice articolo)
+4. A destra: seleziona Item, Conto di costo, flag "Ricorda associazione"
+5. Il sistema pre-compila automaticamente in base alle associazioni precedenti
+6. Con **"Ricorda associazione"** attivo, la prossima fattura dello stesso fornitore verrà pre-compilata automaticamente
+
+#### Auto-apprendimento Articoli
+Il sistema memorizza le associazioni nella child table **Item Supplier**:
+- Prima fattura: selezione manuale degli Item nel dialog
+- Fatture successive: match automatico per codice articolo XML o descrizione
+- Strategia a cascata: codice articolo → descrizione esatta → similarità (>70%)
 
 #### Creazione da PO/PR
 1. Apri una Fattura SDI con stato "Da importare"
@@ -282,7 +293,7 @@ git push origin feature/AmazingFeature
 
 GNU Affero General Public License v3.0 - vedi [LICENSE](LICENSE)
 
-Copyright (C) 2024-2025 Solede SA and contributors
+Copyright (C) 2024-2026 Solede SA and contributors
 
 Puoi usare, modificare e distribuire liberamente. Se offri come servizio web/SaaS, DEVI condividere il codice sorgente modificato.
 
