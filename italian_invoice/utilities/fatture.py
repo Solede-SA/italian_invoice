@@ -364,6 +364,9 @@ def get_party_name(party):
 	if party.doctype == "Supplier":
 		name = party.supplier_name
 
+	if name and len(name) > 80:
+		name = name[:80]
+
 	return name
 
 
