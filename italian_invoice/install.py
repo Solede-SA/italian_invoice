@@ -14,6 +14,7 @@ def before_install():
 def after_install():
 	"""Create default document types and ensure required fields for e-invoicing"""
 	create_default_document_types()
+	create_default_motivi_esenzione_iva()
 	create_italian_customer_fields()
 
 
@@ -112,6 +113,46 @@ def create_default_document_types():
 			frappe.db.commit()
 
 	frappe.msgprint("Default document types created successfully", alert=True)
+
+
+def create_default_motivi_esenzione_iva():
+	"""Create default Motivo esenzione IVA records (natura codes N1-N7)"""
+	motivi = [
+		{"codice": "N1", "descrizione": "Escluse ex art. 15"},
+		{"codice": "N2", "descrizione": "Non Soggette"},
+		{"codice": "N2.1", "descrizione": "non soggette ad IVA ai sensi degli artt. da 7 a 7-septies del DPR 633/72"},
+		{"codice": "N2.2", "descrizione": "non soggette – altri casi"},
+		{"codice": "N3", "descrizione": "non imponibili"},
+		{"codice": "N3.1", "descrizione": "Non imponibili"},
+		{"codice": "N3.2", "descrizione": "non imponibili – cessioni intracomunitarie"},
+		{"codice": "N3.3", "descrizione": "non imponibili – cessioni verso San Marino"},
+		{"codice": "N3.4", "descrizione": "non imponibili – operazioni assimilate alle cessioni all'esportazione"},
+		{"codice": "N3.5", "descrizione": "Art. 8, comma 1, lettera c), D.P.R. 633/1972"},
+		{"codice": "N3.6", "descrizione": "non imponibili – altre operazioni che non concorrono alla formazione del plafond"},
+		{"codice": "N4", "descrizione": "Esenti"},
+		{"codice": "N5", "descrizione": "regime del margine / IVA non esposta in fattura"},
+		{"codice": "N6", "descrizione": "inversione contabile"},
+		{"codice": "N6.1", "descrizione": "inversione contabile – cessione di rottami e altri materiali di recupero"},
+		{"codice": "N6.2", "descrizione": "inversione contabile – cessione di oro e argento puro"},
+		{"codice": "N6.3", "descrizione": "inversione contabile – subappalto nel settore edile"},
+		{"codice": "N6.4", "descrizione": "inversione contabile – cessione di fabbricati"},
+		{"codice": "N6.5", "descrizione": "inversione contabile – cessione di telefoni cellulari"},
+		{"codice": "N6.6", "descrizione": "inversione contabile – cessione di prodotti elettronici"},
+		{"codice": "N6.7", "descrizione": "inversione contabile – prestazioni comparto edile e settori connessi"},
+		{"codice": "N6.8", "descrizione": "inversione contabile – operazioni settore energetico"},
+		{"codice": "N6.9", "descrizione": "Art. 17, c. 6, lett. a-ter), DPR 633/1972"},
+		{"codice": "N7", "descrizione": "IVA assolta in altro stato UE"},
+	]
+
+	for motivo in motivi:
+		if not frappe.db.exists("Motivo esenzione IVA", motivo["codice"]):
+			frappe.get_doc({
+				"doctype": "Motivo esenzione IVA",
+				"codice": motivo["codice"],
+				"descrizione": motivo["descrizione"],
+			}).insert(ignore_permissions=True)
+
+	frappe.db.commit()
 
 
 def create_italian_customer_fields():
