@@ -867,8 +867,8 @@ def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 		total = invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return)
 
 		if tax_rate == 0 and natura:
-			# IVA 0% con natura: crea riga tax con importo 0 e conto specifico
-			tax_account = get_tax_account_by_natura(natura, company)
+			# IVA 0% con natura: crea riga tax con importo 0 e conto IVA 0%
+			tax_account = get_tax_account(tax_rate, company)
 			description = rif_normativo or f"Natura {natura}"
 
 			taxes.append({
@@ -973,41 +973,6 @@ def get_tax_account(tax_rate, company, root_type=None):
 		f"Assicurarsi che esista un account con tax_rate={tax_rate} e account_type='Tax'."
 	)
 
-
-def get_tax_account_by_natura(natura, company):
-	"""
-	Restituisce l'account contabile per operazioni con natura (IVA 0%).
-	Cerca un Account con account_name che contenga il codice natura.
-
-	Args:
-	    natura: Codice natura (N1, N2.2, N3.5, N4, N6.1, ecc.)
-	    company: Nome company
-
-	Returns:
-	    Nome dell'account
-	"""
-	# Cerca account con nome che contiene il codice natura (es. "N4" o "N6")
-	natura_base = natura.split(".")[0] if "." in natura else natura
-
-	for search_term in (natura, natura_base):
-		accounts = frappe.db.get_all(
-			"Account",
-			{
-				"company": company,
-				"account_name": ["like", f"%{search_term}%"],
-				"account_type": "Tax",
-				"is_group": 0,
-			},
-			["name"],
-			limit=1,
-		)
-		if accounts:
-			return accounts[0]["name"]
-
-	frappe.throw(
-		f"Account non trovato per natura '{natura}' in {company}. "
-		f"Creare un account di tipo Tax con il codice natura nel nome (es. 'IVA Acquisti {natura}')."
-	)
 
 
 def get_or_create_item_code(line):
