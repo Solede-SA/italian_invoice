@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:codice",
  "creation": "2024-07-24 20:14:15.788454",
