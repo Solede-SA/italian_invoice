@@ -398,6 +398,31 @@ class OpenAPIProvider(SDIProvider):
 			return results[0]
 		return results
 
+	def update_business_register(self, company, config: dict) -> dict:
+		"""
+		Aggiorna configurazione business register esistente presso OpenAPI (PATCH)
+
+		Args:
+		    company: Documento Company
+		    config: Campi da aggiornare
+
+		Returns:
+		    dict: Risultato aggiornamento
+		"""
+		url = self.get_service_url("SDI", "business_registry_configurations")
+		headers = {
+			"Authorization": company.custom_open_api_token,
+			"Content-Type": "application/json",
+		}
+
+		response = requests.patch(url, headers=headers, json=config)
+
+		if response.status_code == 200:
+			return response.json()["data"]
+		else:
+			message = response.json().get("message", response.content)
+			frappe.throw(f"Errore aggiornamento business register: {message}")
+
 	def setup_business_register(self, company, config: dict) -> dict:
 		"""
 		Configura business register presso OpenAPI
