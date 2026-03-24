@@ -400,28 +400,30 @@ class OpenAPIProvider(SDIProvider):
 
 	def update_business_register(self, company, config: dict) -> dict:
 		"""
-		Aggiorna configurazione business register esistente presso OpenAPI (PATCH)
+		Aggiorna configurazione business register esistente presso OpenAPI.
+		L'API non supporta PATCH, quindi fa DELETE + POST.
 
 		Args:
 		    company: Documento Company
-		    config: Campi da aggiornare
+		    config: Configurazione completa da ricreare
 
 		Returns:
-		    dict: Risultato aggiornamento
+		    dict: Risultato configurazione
 		"""
-		url = self.get_service_url("SDI", "business_registry_configurations")
+		fiscal_id = config.get("fiscal_id") or company.tax_id
+		base_url = self.get_service_url("SDI", f"business_registry_configurations/{fiscal_id}")
 		headers = {
 			"Authorization": company.custom_open_api_token,
 			"Content-Type": "application/json",
 		}
 
-		response = requests.patch(url, headers=headers, json=config)
+		# DELETE configurazione esistente
+		response = requests.delete(base_url, headers=headers)
+		if response.status_code != 200:
+			frappe.throw(f"Errore cancellazione business register: HTTP {response.status_code} - {response.text}")
 
-		if response.status_code == 200:
-			return response.json()["data"]
-		else:
-			message = response.json().get("message", response.content)
-			frappe.throw(f"Errore aggiornamento business register: {message}")
+		# POST nuova configurazione
+		return self.setup_business_register(company, config)
 
 	def setup_business_register(self, company, config: dict) -> dict:
 		"""
@@ -450,8 +452,7 @@ class OpenAPIProvider(SDIProvider):
 			if response.status_code == 200:
 				return response.json()["data"]
 			else:
-				message = response.json().get("message", response.content)
-				frappe.throw(f"Errore business register: {message}")
+				frappe.throw(f"Errore business register: HTTP {response.status_code} - {response.text}")
 
 		except Exception as e:
 			self.logger.exception(f"Errore setup business register: {str(e)}")
