@@ -269,18 +269,6 @@ fixtures = [
 		],
 	},
 	{
-		"dt": "Workspace",
-		"filters": [
-			[
-				"module",
-				"in",
-				[
-					"Italian Invoice",
-				],
-			],
-		],
-	},
-	{
 		"dt": "Print Format",
 		"filters": [
 			[
