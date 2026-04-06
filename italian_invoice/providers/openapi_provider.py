@@ -352,7 +352,7 @@ class OpenAPIProvider(SDIProvider):
 			if not company_list:
 				frappe.throw(f"Company non trovata: {partita_iva_company}")
 
-			company = frappe.get_doc("Company", company_list[0]["name"])
+			company = company_list[0]["name"]
 
 			# Crea documento fattura fornitore
 			fattura_fornitore = frappe.new_doc("Fattura Fornitori SDI")
