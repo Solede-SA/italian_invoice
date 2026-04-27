@@ -7,6 +7,7 @@ import json
 from difflib import SequenceMatcher
 
 import frappe
+from frappe import _
 
 
 def get_or_create_supplier(supplier_vat_id, invoice_data):
@@ -374,9 +375,10 @@ def process_supplier_invoice(
 		# Estrai righe fattura
 		invoice_lines = extract_invoice_lines(payload)
 
-		# Verifica se è una nota di credito
-		tipo_documento = doc_data.get("tipo_documento")
-		is_return = is_credit_note(tipo_documento)
+		# Verifica se è una nota di credito (con fallback su importo negativo)
+		is_return, anomaly = _resolve_is_return(doc_data)
+		if anomaly:
+			frappe.msgprint(anomaly, alert=True, indicator="orange")
 
 		# Crea Purchase Invoice
 		purchase_invoice = frappe.get_doc(
@@ -423,6 +425,35 @@ def process_supplier_invoice(
 def is_credit_note(tipo_documento):
 	"""Verifica se il tipo documento è una nota di credito"""
 	return tipo_documento in ["TD04", "TD05", "TD08", "TD09"]
+
+
+def _resolve_is_return(doc_data):
+	"""Determina is_return dal tipo_documento SDI; fallback su importo totale negativo
+	per gestire fornitori che mandano note di credito mascherate da TD01.
+
+	Returns:
+		(is_return: bool, anomaly_msg: str | None) — anomaly_msg valorizzato solo
+		quando il fallback negativo è scattato e va segnalato all'operatore.
+	"""
+	tipo_documento = doc_data.get("tipo_documento")
+	if is_credit_note(tipo_documento):
+		return True, None
+
+	importo = doc_data.get("importo_totale_documento")
+	try:
+		importo_float = float(importo) if importo is not None else 0.0
+	except (TypeError, ValueError):
+		importo_float = 0.0
+
+	if importo_float < 0:
+		msg = _(
+			"Anomalia SDI: importo totale negativo ({0}) ma tipo_documento={1}. "
+			"Importata come nota di credito (is_return=1). "
+			"Verifica con il fornitore l'invio del tipo corretto (TD04)."
+		).format(importo, tipo_documento or "?")
+		return True, msg
+
+	return False, None
 
 
 def invert_sign_for_credit_note(value, is_return):
@@ -544,11 +575,11 @@ def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sd
 	# Estrai e applica l'IVA dalla fattura SDI
 	body = get_fattura_body(fattura_sdi.dati_fattura)
 	if body:
-		# Verifica se è una nota di credito
-		tipo_documento = (
-			body.get("dati_generali", {}).get("dati_generali_documento", {}).get("tipo_documento", "")
-		)
-		is_return = is_credit_note(tipo_documento)
+		# Verifica se è una nota di credito (con fallback su importo negativo)
+		doc_data = body.get("dati_generali", {}).get("dati_generali_documento", {}) or {}
+		is_return, anomaly = _resolve_is_return(doc_data)
+		if anomaly:
+			frappe.msgprint(anomaly, alert=True, indicator="orange")
 
 		# Estrai riepilogo IVA e prepara le tasse
 		tax_summary = extract_tax_summary(body)
