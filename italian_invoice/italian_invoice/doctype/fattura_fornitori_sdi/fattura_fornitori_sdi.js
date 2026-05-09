@@ -15,9 +15,12 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
             frm.enable_save();
         }
 
-        frm.add_custom_button(__("Scarica PDF"), () => {
-            window.location.href = `/api/method/openapi.api.sdi.fatture.download?doctype=Fattura Fornitori SDI&docname=${frm.doc.name}&type=pdf`;
-        });
+        // "Scarica PDF" disponibile solo se l'app openapi è installata (provider SDI specifico)
+        if (frappe.boot.installed_apps && frappe.boot.installed_apps.includes('openapi')) {
+            frm.add_custom_button(__("Scarica PDF"), () => {
+                window.location.href = `/api/method/openapi.api.sdi.fatture.download?doctype=Fattura Fornitori SDI&docname=${frm.doc.name}&type=pdf`;
+            });
+        }
 
         // Pulisci campo documenti aperti
         frm.get_field('documenti_aperti').$wrapper.html('');
@@ -36,10 +39,10 @@ frappe.ui.form.on("Fattura Fornitori SDI", {
 
                     // Prima verifichiamo/creiamo il fornitore
                     frappe.call({
-                        method: "openapi.api.eInvoice.purchase_invoice.get_or_create_supplier",
+                        method: "italian_invoice.utilities.fatture_passive.get_or_create_supplier",
                         args: {
                             supplier_vat_id: supplier_vat,
-                            fattura_fornitori_sdi: frm.doc.name
+                            invoice_data: frm.doc.dati_fattura
                         },
                         callback: (r) => {
                             if (!r.message.success) {
@@ -286,9 +289,9 @@ function show_items_dialog(frm, supplier_data) {
             });
 
             frappe.call({
-                method: "openapi.api.eInvoice.purchase_invoice.process_supplier_invoice",
+                method: "italian_invoice.utilities.fatture_passive.process_supplier_invoice",
                 args: {
-                    json_data_string: frm.doc.dati_fattura,
+                    invoice_data: frm.doc.dati_fattura,
                     fattura_fornitori_sdi: frm.doc.name,
                     item_mappings: item_mappings
                 },

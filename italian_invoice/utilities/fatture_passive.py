@@ -9,20 +9,39 @@ from difflib import SequenceMatcher
 import frappe
 
 
+@frappe.whitelist()
 def get_or_create_supplier(supplier_vat_id, invoice_data):
 	"""
 	Controlla se esiste un fornitore con la partita IVA data, altrimenti lo crea
 
 	Args:
 	    supplier_vat_id: Partita IVA del fornitore
-	    invoice_data: Dati fattura per recuperare info fornitore
+	    invoice_data: Dati fattura (dict o JSON string) per recuperare info fornitore
 
 	Returns:
 	    dict: Dati del fornitore (esistente o appena creato)
 	"""
+	if isinstance(invoice_data, str):
+		invoice_data = json.loads(invoice_data)
+
+	supplier_data = None
 	try:
-		# Cerca fornitore esistente
+		# Cerca fornitore per P.IVA
 		supplier = frappe.db.exists("Supplier", {"tax_id": supplier_vat_id})
+
+		if not supplier:
+			# Fallback: cerca per nome (potrebbe esistere un fornitore senza tax_id)
+			supplier_data = extract_supplier_data(invoice_data)
+			denominazione = (
+				supplier_data.get("dati_anagrafici", {}).get("anagrafica", {}).get("denominazione", "")
+				or supplier_data.get("dati_anagrafici", {}).get("anagrafica", {}).get("nome", "")
+			)
+			if denominazione:
+				supplier = frappe.db.exists("Supplier", {"supplier_name": denominazione})
+
+			if supplier:
+				# Trovato per nome: aggiorna la P.IVA mancante
+				frappe.db.set_value("Supplier", supplier, "tax_id", supplier_vat_id)
 
 		if supplier:
 			# Ritorna i dati del fornitore esistente
@@ -34,8 +53,9 @@ def get_or_create_supplier(supplier_vat_id, invoice_data):
 				"is_new": False,
 			}
 
-		# Estrai dati fornitore dal JSON/XML
-		supplier_data = extract_supplier_data(invoice_data)
+		# Estrai dati fornitore se non ancora fatto
+		if not supplier_data:
+			supplier_data = extract_supplier_data(invoice_data)
 
 		# Crea nuovo fornitore
 		new_supplier = create_supplier(supplier_data, invoice_data.get("company"))
@@ -49,7 +69,8 @@ def get_or_create_supplier(supplier_vat_id, invoice_data):
 		}
 
 	except Exception as e:
-		frappe.log_error(f"Errore in get_or_create_supplier: {str(e)}", "Italian Invoice Passive")
+		# Titolo del log troncato a 140 char (limite Frappe per il campo title)
+		frappe.log_error(str(e)[:140], "Italian Invoice Passive")
 		return {"success": False, "error": str(e)}
 
 
