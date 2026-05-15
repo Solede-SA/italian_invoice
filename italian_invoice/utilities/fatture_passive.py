@@ -9,6 +9,15 @@ from difflib import SequenceMatcher
 import frappe
 from frappe import _
 
+SUPPLIER_PART_NO_MAX_LEN = 140
+
+
+def _normalize_part_no(value):
+	"""Tronca a 140 char (limite colonna Item Supplier.supplier_part_no)."""
+	if not value:
+		return ""
+	return value.strip()[:SUPPLIER_PART_NO_MAX_LEN]
+
 
 def get_or_create_supplier(supplier_vat_id, invoice_data):
 	"""
@@ -162,8 +171,13 @@ def save_item_supplier_mappings(mappings, supplier_name):
 	if isinstance(mappings, str):
 		mappings = json.loads(mappings)
 
-	# Filtra mappings validi e raccogli item_code unici
-	valid = [(m["item_code"], m["supplier_part_no"]) for m in mappings if m.get("item_code") and m.get("supplier_part_no")]
+	# Filtra mappings validi (normalizzando part_no entro il limite colonna) e raccogli item_code unici
+	valid = [
+		(m["item_code"], _normalize_part_no(m["supplier_part_no"]))
+		for m in mappings
+		if m.get("item_code") and m.get("supplier_part_no")
+	]
+	valid = [(ic, pn) for ic, pn in valid if pn]
 	if not valid:
 		return
 
@@ -176,13 +190,13 @@ def save_item_supplier_mappings(mappings, supplier_name):
 		filters={"parent": ["in", item_codes], "supplier": supplier_name},
 		fields=["parent", "supplier_part_no"],
 	):
-		existing_keys.add((row["parent"], (row["supplier_part_no"] or "").strip().lower()))
+		existing_keys.add((row["parent"], _normalize_part_no(row["supplier_part_no"]).lower()))
 
 	# Raggruppa per item_code per caricare ogni Item una volta sola
 	from collections import defaultdict
 	items_to_update = defaultdict(list)
 	for item_code, part_no in valid:
-		if (item_code, part_no.strip().lower()) not in existing_keys:
+		if (item_code, part_no.lower()) not in existing_keys:
 			items_to_update[item_code].append(part_no)
 
 	for item_code, part_nos in items_to_update.items():
@@ -238,10 +252,10 @@ def find_matching_items(supplier_name, invoice_lines):
 	matches = {}
 	from_supplier, from_default = _get_supplier_items(supplier_name)
 
-	# Indice supplier_part_no → item_code per lookup rapido
+	# Indice supplier_part_no → item_code per lookup rapido (normalizzato a 140 char)
 	part_no_map = {}
 	for entry in from_supplier:
-		pn = (entry.get("supplier_part_no") or "").strip().lower()
+		pn = _normalize_part_no(entry.get("supplier_part_no")).lower()
 		if pn:
 			part_no_map[pn] = entry["item_code"]
 
@@ -281,14 +295,15 @@ def find_matching_items(supplier_name, invoice_lines):
 
 		# 1. Match per codice articolo XML → supplier_part_no
 		if codice:
-			codice_lower = codice.strip().lower()
+			codice_lower = _normalize_part_no(codice).lower()
 			if codice_lower in part_no_map:
 				matched_item = part_no_map[codice_lower]
 
-		# 2. Match esatto descrizione → supplier_part_no
+		# 2. Match esatto descrizione → supplier_part_no (troncata al limite colonna)
 		if not matched_item and line_desc_lower:
-			if line_desc_lower in part_no_map:
-				matched_item = part_no_map[line_desc_lower]
+			desc_key = _normalize_part_no(line_desc).lower()
+			if desc_key in part_no_map:
+				matched_item = part_no_map[desc_key]
 
 		# 3. Match per similarità su item_name/description
 		if not matched_item and line_desc_lower and items_details:
