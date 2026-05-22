@@ -8,9 +8,9 @@ const getCustomerTipoFatturaElettronica = (frm) => {
     frm.set_value("naming_series", "NCINV/.YY./");
     return true;
   }
-  // if (frm.doc.custom_tipo_di_documento) {
-  //   return true;
-  // }
+  if (frm.doc.custom_tipo_di_documento) {
+    return true;
+  }
   if (frm.doc.customer !== undefined) {
       frappe.db
         .get_value(
