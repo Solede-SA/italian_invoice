@@ -17,13 +17,15 @@ def execute(doc, method=None):
 
 	customer = frappe.db.get_value(
 		"Customer", doc.customer,
-		["tax_id", "custom_codice_univoco", "is_public_administration"],
+		["tax_id", "fiscal_code", "custom_codice_univoco", "is_public_administration"],
 		as_dict=True,
 	)
 	if not customer:
 		frappe.throw(_("Sales Invoice {0}: cliente {1} non trovato.").format(doc.name, doc.customer))
 
-	if not (customer.tax_id or doc.get("tax_id")):
+	# B2B: Partita IVA (tax_id). B2C / privati: Codice Fiscale (fiscal_code). Per la fattura
+	# elettronica ne basta uno dei due — i privati non hanno P.IVA.
+	if not (customer.tax_id or customer.fiscal_code or doc.get("tax_id")):
 		frappe.throw(_("Cliente {0}: Partita IVA / Codice Fiscale mancante, obbligatorio per la fattura elettronica.").format(doc.customer))
 
 	if customer.is_public_administration and not customer.custom_codice_univoco:

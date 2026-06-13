@@ -902,8 +902,12 @@ def get_unamended_name(doc):
 
 
 def get_progressive_name(doc):
+	# ProgressivoInvio FatturaPA: identificativo di TRASMISSIONE, max 10 caratteri (vincolo XSD),
+	# distinto dal Numero fattura (che usa get_unamended_name e ammette fino a 20 caratteri). Le
+	# serie reali (es. FT-{ABBR}-.YYYY.- per studio) superano i 10 caratteri: teniamo la coda
+	# (anno + progressivo), che resta univoca per trasmittente.
 	name = get_unamended_name(doc)
-	return name.split("/")[-1]
+	return name.split("/")[-1][-10:]
 
 
 # def set_state_code(doc, method):
