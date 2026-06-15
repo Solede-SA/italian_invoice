@@ -8,9 +8,6 @@ const getCustomerTipoFatturaElettronica = (frm) => {
     frm.set_value("naming_series", "NCINV/.YY./");
     return true;
   }
-  if (frm.doc.custom_tipo_di_documento) {
-    return true;
-  }
   if (frm.doc.customer !== undefined) {
       frappe.db
         .get_value(
@@ -19,10 +16,15 @@ const getCustomerTipoFatturaElettronica = (frm) => {
           ['custom_tipo_fattura_elettronica', 'custom_vat_collectability', 'custom_codice_univoco', 'is_public_administration', 'tax_id', 'fiscal_code'],
         )
         .then((r) => {
-          if (r.message.custom_tipo_fattura_elettronica) {
-            frm.set_value("custom_tipo_di_documento", r.message.custom_tipo_fattura_elettronica);
-          } else {
-            frm.set_value("custom_tipo_di_documento", "TD24");
+          // Il default del tipo documento si imposta solo se mancante; il ramo PA
+          // (esigibilità + naming series) deve girare comunque. La garanzia resta
+          // server-side (before_naming + validate), questo è solo feedback Desk.
+          if (!frm.doc.custom_tipo_di_documento) {
+            if (r.message.custom_tipo_fattura_elettronica) {
+              frm.set_value("custom_tipo_di_documento", r.message.custom_tipo_fattura_elettronica);
+            } else {
+              frm.set_value("custom_tipo_di_documento", "TD24");
+            }
           }
           if (r.message.custom_vat_collectability) {
             frm.set_value("vat_collectability", r.message.custom_vat_collectability);
@@ -33,7 +35,6 @@ const getCustomerTipoFatturaElettronica = (frm) => {
             if (frm.doc.is_return == 0 && frm.doc.__islocal) {
               frm.set_value("naming_series", "PAINV/.YY./")
             }
-            ;
           } else {
             if (frm.doc.is_return == 0 && frm.doc.__islocal) {
               frm.set_value("naming_series", "SINV/.YY./")

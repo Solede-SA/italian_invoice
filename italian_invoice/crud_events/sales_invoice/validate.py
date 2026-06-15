@@ -18,10 +18,23 @@ def is_subject_to_letter_of_intent(doc):
 	return False
 
 
-def manage_split_payment(doc, method):
+def set_vat_collectability(doc, customer):
+	"""Imposta l'esigibilità IVA lato server (fonte di verità).
+
+	Per le Pubbliche Amministrazioni è SEMPRE scissione dei pagamenti (obbligo
+	fiscale, allineato al blocco `<EsigibilitaIVA>S</EsigibilitaIVA>` dell'XML).
+	Per gli altri clienti si applica il default impostato sul cliente solo se il
+	campo è vuoto, senza sovrascrivere una scelta deliberata.
+	"""
+	if customer.is_public_administration:
+		doc.vat_collectability = "S-Scissione dei Pagamenti"
+	elif not doc.vat_collectability and customer.custom_vat_collectability:
+		doc.vat_collectability = customer.custom_vat_collectability
+
+
+def manage_split_payment(doc, customer):
 	# Controlla se il cliente ha il flag dello split payment
-	is_split = frappe.get_value("Customer", doc.customer, "is_public_administration")
-	if not is_split:
+	if not customer.is_public_administration:
 		return
 
 	# Identifica i conti di tassa e di offset tra le preferenze della company
@@ -104,4 +117,12 @@ def execute(doc, method=None):
 			"Il cliente è soggetto a lettera di intento. Il motivo esenzione IVA è stato settato a N3.5 e il bollo virtuale è stato settato a 1"
 		)
 
-	manage_split_payment(doc, method)
+	# Una sola lettura del Customer per esigibilità IVA e split payment (DRY).
+	customer = frappe.get_value(
+		"Customer",
+		doc.customer,
+		["is_public_administration", "custom_vat_collectability"],
+		as_dict=True,
+	)
+	set_vat_collectability(doc, customer)
+	manage_split_payment(doc, customer)
