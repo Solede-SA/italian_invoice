@@ -294,17 +294,25 @@ def get_billing_address(doc, invoice):
 		return frappe.get_doc("Address", invoice.supplier_address)
 
 	if doc.doctype == "Company":
-		address = frappe.db.get_values(
+		# Indirizzo del CedentePrestatore SCOPATO alla company della fattura (via Dynamic Link): su un
+		# sito multi-company un filtro globale `is_your_company_address` pescherebbe l'indirizzo di
+		# un'ALTRA azienda → mittente errato in fattura.
+		address = frappe.get_all(
 			"Address",
-			{"is_primary_address": 1, "is_your_company_address": 1},
-			["*"],
-			as_dict=True,
+			filters=[
+				["Dynamic Link", "link_doctype", "=", "Company"],
+				["Dynamic Link", "link_name", "=", doc.name],
+				["Address", "is_your_company_address", "=", 1],
+			],
+			fields=["*"],
+			order_by="is_primary_address desc",  # se l'azienda ha più indirizzi aziendali, preferisci il primario
+			limit=1,
 		)
 
 		if not address:
 			frappe.throw(
 				frappe._("Nessun indirizzo di fatturazione trovato per l'azienda {0}. "
-				"Configurare un Address con 'Is Primary Address' e 'Is Your Company Address' abilitati.").format(doc.name)
+				"Configurare un Address con 'Is Your Company Address' abilitato.").format(doc.name)
 			)
 
 		return address[0]
