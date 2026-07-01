@@ -154,6 +154,90 @@ class OpenAPIProvider(SDIProvider):
 			self.logger.exception(f"Errore recupero stato: {str(e)}")
 			return {"error": f"Errore recupero stato: {str(e)}"}
 
+	def _to_rome_str(self, dt) -> str:
+		"""Formatta un datetime come stringa nel fuso Europe/Rome"""
+		rome_tz = pytz.timezone("Europe/Rome")
+		return dt.astimezone(rome_tz).strftime("%Y-%m-%d %H:%M:%S")
+
+	def _apply_status_update(self, transazione, event, stato, data_notifica, raw_data, fattura=None):
+		"""
+		Applica un aggiornamento di stato a una Transazione SDI: accoda la notifica,
+		aggiorna ultima_notifica/stato_invio e salva transazione + fattura collegata.
+		Condiviso tra handle_notification() (webhook) e reconcile_status() (riconciliazione manuale).
+
+		Args:
+		    transazione: Documento Transazione SDI
+		    event: Nome evento/notifica (es. "customer-notification", "manual-reconcile")
+		    stato: Nuovo codice stato, o None per non cambiare stato
+		    data_notifica: Timestamp formattato "%Y-%m-%d %H:%M:%S" (Europe/Rome)
+		    raw_data: Payload grezzo da salvare in notifiche_sdi/ultima_notifica
+		    fattura: Documento fattura già caricato, se disponibile (evita un get_doc extra)
+		"""
+		formatted_original_data = json.dumps(raw_data, indent=2)
+		transazione.append(
+			"notifiche_sdi",
+			{
+				"notifica": event,
+				"data": formatted_original_data,
+				"data_notifica": data_notifica,
+				"uuid": transazione.uuid,
+			},
+		)
+
+		# Aggiorna ultima_notifica solo se non è legal-storage-receipt
+		if event != "legal-storage-receipt":
+			transazione.ultima_notifica = formatted_original_data
+
+		# Aggiorna stato solo se presente (escluso legal-storage-receipt)
+		if stato:
+			transazione.stato_invio = stato
+
+		transazione.save()
+
+		# Aggiorna Sales Invoice solo se lo stato è cambiato
+		if stato:
+			fattura = fattura or frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
+			fattura.save()
+
+	def reconcile_status(self, transazione_sdi_name: str) -> dict:
+		"""
+		Interroga OpenAPI per lo stato reale di una transazione già inviata.
+		Procedura di emergenza: usata quando una notifica SDI non ha mai
+		aggiornato il documento (es. webhook non arrivato/non processato).
+
+		Args:
+		    transazione_sdi_name: Nome del documento Transazione SDI
+
+		Returns:
+		    dict: stato_precedente, stato_nuovo, raw (risposta grezza di OpenAPI)
+		"""
+		transazione = frappe.get_doc("Transazione SDI", transazione_sdi_name)
+		fattura = frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
+		company = frappe.get_doc("Company", fattura.company)
+
+		remote_status = self.get_invoice_status(transazione.uuid, company)
+
+		if remote_status.get("error"):
+			frappe.throw(remote_status["error"])
+
+		stato_precedente = transazione.stato_invio
+		data_notifica = self._to_rome_str(frappe.utils.now_datetime())
+
+		self._apply_status_update(
+			transazione,
+			"manual-reconcile",
+			remote_status.get("status"),
+			data_notifica,
+			remote_status,
+			fattura=fattura,
+		)
+
+		return {
+			"stato_precedente": stato_precedente,
+			"stato_nuovo": transazione.stato_invio,
+			"raw": remote_status,
+		}
+
 	def handle_notification(self, notification_data: dict) -> dict:
 		"""
 		Gestisce notifiche SDI
@@ -208,37 +292,11 @@ class OpenAPIProvider(SDIProvider):
 					transazione = frappe.get_doc("Transazione SDI", lista_transazioni[0]["name"])
 
 					# Converti data
-					data_notifica_parsed = parse(data_notifica)
-					rome_tz = pytz.timezone("Europe/Rome")
-					data_notifica_rome = data_notifica_parsed.astimezone(rome_tz)
-					formatted_data_notifica = data_notifica_rome.strftime("%Y-%m-%d %H:%M:%S")
+					formatted_data_notifica = self._to_rome_str(parse(data_notifica))
 
-					# Salva notifica
-					formatted_original_data = json.dumps(notification_data, indent=2)
-					transazione.append(
-						"notifiche_sdi",
-						{
-							"notifica": event,
-							"data": formatted_original_data,
-							"data_notifica": formatted_data_notifica,
-							"uuid": uuid,
-						},
+					self._apply_status_update(
+						transazione, event, stato, formatted_data_notifica, notification_data
 					)
-
-					# Aggiorna ultima_notifica solo se non è legal-storage-receipt
-					if event != "legal-storage-receipt":
-						transazione.ultima_notifica = formatted_original_data
-
-					# Aggiorna stato solo se presente (escluso legal-storage-receipt)
-					if stato:
-						transazione.stato_invio = stato
-
-					transazione.save()
-
-					# Aggiorna Sales Invoice solo se lo stato è cambiato
-					if stato:
-						fattura = frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
-						fattura.save()
 
 					return {"success": True, "message": f"Notifica {event} elaborata"}
 

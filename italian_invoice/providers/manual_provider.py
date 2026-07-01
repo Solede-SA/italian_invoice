@@ -136,6 +136,22 @@ class ManualProvider(SDIProvider):
 
 		return {"error": f"Transazione con UUID {uuid} non trovata"}
 
+	def reconcile_status(self, transazione_sdi_name: str) -> dict:
+		"""
+		Non supportato: il provider Manuale non ha un servizio esterno da interrogare,
+		lo stato è già quello locale in Transazione SDI.
+
+		Args:
+		    transazione_sdi_name: Nome del documento Transazione SDI
+
+		Returns:
+		    dict: mai ritornato, solleva sempre eccezione
+		"""
+		frappe.throw(
+			"Il provider Manuale non supporta la riconciliazione dello stato: "
+			"non esiste un servizio SDI esterno da interrogare."
+		)
+
 	def handle_notification(self, notification_data: dict) -> dict:
 		"""
 		Simula gestione notifica

@@ -54,6 +54,21 @@ class SDIProvider(ABC):
 		raise NotImplementedError
 
 	@abstractmethod
+	def reconcile_status(self, transazione_sdi_name: str) -> dict:
+		"""
+		Interroga il provider per lo stato reale di una transazione già inviata
+		e riallinea Transazione SDI/fattura se lo stato risulta diverso.
+		Uso: procedura di emergenza quando una notifica SDI non è mai arrivata.
+
+		Args:
+		    transazione_sdi_name: Nome del documento Transazione SDI
+
+		Returns:
+		    dict: stato_precedente, stato_nuovo, raw (risposta grezza del provider)
+		"""
+		raise NotImplementedError
+
+	@abstractmethod
 	def handle_notification(self, notification_data: dict) -> dict:
 		"""
 		Gestisce notifiche SDI
