@@ -11,7 +11,19 @@ def execute(doc, method=None):
 
 	Centralizzata qui: copre TUTTE le Sales Invoice del bench (garemed, daeok, manuali),
 	così la regola fiscale è una sola e non duplicata per app.
+
+	Vale solo per le società italiane: la fattura elettronica (SDI) è un obbligo
+	italiano — le fatture di società estere (es. svizzere) non passano da SDI.
 	"""
+	if frappe.get_cached_value("Company", doc.company, "country") != "Italy":
+		return
+
+	# Il Tipo di Documento (TD01, TD24, …) finisce nell'XML: obbligatorio al submit.
+	# Enforcement qui e non con reqd sul Custom Field, che bloccherebbe anche le
+	# fatture delle società estere (il metadato non distingue il paese).
+	if not doc.custom_tipo_di_documento:
+		frappe.throw(_("Sales Invoice {0}: Tipo di Documento mancante, obbligatorio per la fattura elettronica.").format(doc.name))
+
 	if not doc.customer_address:
 		frappe.throw(_("Sales Invoice {0}: indirizzo di fatturazione mancante, obbligatorio per la fattura elettronica.").format(doc.name))
 
