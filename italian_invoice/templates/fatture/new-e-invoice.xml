@@ -241,9 +241,9 @@
                     <ModalitaPagamento>{{ payment_term.mode_of_payment_code.split("-")[0] }}</ModalitaPagamento>
                     <DataScadenzaPagamento>{{ payment_term.due_date }}</DataScadenzaPagamento>
                     {% if doc.vat_collectability == 'S' %}
-                         <ImportoPagamento>{{ macros.format_float(doc.net_total) }}</ImportoPagamento>
+                         <ImportoPagamento>{{ macros.format_float(doc.net_total * doc.conversion_rate) }}</ImportoPagamento>
                     {% else %}
-                        <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount) }}</ImportoPagamento>
+                        <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount * doc.conversion_rate) }}</ImportoPagamento>
                     {% endif %}
                     {% if payment_term.bank_account %}
 
