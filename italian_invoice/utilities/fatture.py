@@ -443,15 +443,11 @@ def get_cedente_prestatore(doc):
 	return cedente_prestatore
 
 
-def calculate_grand_total(tax_data, conversion_rate=1):
-	total = 0
-	for key, value in tax_data.items():
-		# if vat_collectability != "S":
-
-		total += value["tax_amount"]
-		total += value["taxable_amount"] * conversion_rate
-
-	return total
+def calculate_grand_total(tax_data):
+	# grand total = imponibile (net) + imposta, entrambi gia' in valuta base (EUR).
+	# taxable_amount NON va riconvertito: e' gia' base, come in calculate_net_total.
+	total_tax = sum(value["tax_amount"] for value in tax_data.values())
+	return calculate_net_total(tax_data) + total_tax
 
 
 def calculate_net_total(tax_data):
@@ -489,7 +485,7 @@ def get_invoice_data(doc):
 
 	conversion_rate = doc.conversion_rate if hasattr(doc, "conversion_rate") else 1
 
-	grand_total = calculate_grand_total(tax_data, conversion_rate)
+	grand_total = calculate_grand_total(tax_data)
 
 	data = {
 		"conversion_rate": conversion_rate,
