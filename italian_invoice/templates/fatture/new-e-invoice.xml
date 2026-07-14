@@ -74,10 +74,14 @@
                         <Cognome>{{ doc.cessionario_committente.name.split()[1] }}</Cognome>
                     </Anagrafica>
                 {% else %}
+                    {# IdFiscaleIVA solo se il cliente ha la Partita IVA: gli enti
+                       senza Partita IVA sono identificati dal solo CodiceFiscale #}
+                    {% if doc.cessionario_committente.tax_id %}
                     <IdFiscaleIVA>
                         <IdPaese>{{ doc.cessionario_committente.address.country_code }}</IdPaese>
                         <IdCodice>{{ doc.cessionario_committente.tax_id | replace("IT","") }}</IdCodice>
                     </IdFiscaleIVA>
+                    {% endif %}
                     {% if doc.cessionario_committente.fiscal_code %}
                         <CodiceFiscale>{{ doc.cessionario_committente.fiscal_code }}</CodiceFiscale>
                     {% endif %}

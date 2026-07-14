@@ -334,3 +334,16 @@ fixtures = [
 		"filters": [["module", "=", "Italian Invoice"]],
 	},
 ]
+
+
+# Override della validazione regionale ERPNext per l'Italia (vedi
+# overrides/regional_italy.py): per i clienti Company non Pubblica
+# Amministrazione basta Partita IVA O Codice Fiscale — l'originale esige
+# sempre la Partita IVA e blocca le fatture degli enti che non la hanno
+# (associazioni, condomini, ...). erpnext.allow_regional usa l'override
+# dell'ultima app installata.
+regional_overrides = {
+	"Italy": {
+		"erpnext.controllers.accounts_controller.validate_regional": "italian_invoice.overrides.regional_italy.sales_invoice_validate",
+	}
+}

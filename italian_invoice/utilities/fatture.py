@@ -387,7 +387,15 @@ def get_party_data(party, invoice):
 		"tax_id": party.tax_id,
 		"recipient_code": get_codice_destinatario(party),
 		"name": get_party_name(party),
-		"type": "Company" if party.tax_id else "Individual",
+		# Ramo "Individual" (Nome/Cognome nell'XML) solo per persone fisiche
+		# senza Partita IVA: chi ha la Partita IVA passa da IdFiscaleIVA, gli
+		# enti senza Partita IVA (associazioni, condomini, ...) restano
+		# "Company" → solo CodiceFiscale + Denominazione.
+		"type": (
+			"Individual"
+			if (not party.tax_id and getattr(party, "customer_type", None) == "Individual")
+			else "Company"
+		),
 		"fiscal_regime": party.fiscal_regime if party.doctype == "Company" else None,
 		"is_public_administration": (party.is_public_administration if party.doctype == "Customer" else None),
 		"address": {
