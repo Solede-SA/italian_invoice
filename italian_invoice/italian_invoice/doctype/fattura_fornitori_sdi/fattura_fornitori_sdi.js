@@ -280,7 +280,7 @@ function _show_create_item_dialog(frm, parent_dialog, supplier_data, line, idx) 
                 label: 'Nome Item',
                 fieldtype: 'Data',
                 fieldname: 'item_name',
-                default: line.descrizione,
+                default: (line.descrizione || '').trim().slice(0, 140),
                 reqd: 1
             },
             {
@@ -313,33 +313,20 @@ function _show_create_item_dialog(frm, parent_dialog, supplier_data, line, idx) 
         primary_action_label: 'Crea',
         primary_action(values) {
             frappe.call({
-                method: 'frappe.client.insert',
+                method: 'italian_invoice.utilities.fatture_passive.create_supplier_item',
                 args: {
-                    doc: {
-                        doctype: 'Item',
-                        item_code: values.item_name,
-                        item_name: values.item_name,
-                        item_group: values.item_group,
-                        description: values.item_name,
-                        stock_uom: values.uom,
-                        is_stock_item: 0,
-                        is_sales_item: 0,
-                        is_purchase_item: 1,
-                        item_defaults: [{
-                            company: frm.doc.company,
-                            expense_account: values.expense_account,
-                            default_supplier: supplier_data.name
-                        }],
-                        supplier_items: [{
-                            supplier: supplier_data.name,
-                            supplier_part_no: codice || line.descrizione
-                        }]
-                    }
+                    item_name: values.item_name,
+                    item_group: values.item_group,
+                    uom: values.uom,
+                    expense_account: values.expense_account,
+                    company: frm.doc.company,
+                    supplier: supplier_data.name,
+                    supplier_part_no: codice || line.descrizione
                 },
                 callback: (r) => {
                     if (r.message) {
                         item_dialog.hide();
-                        parent_dialog.set_value(`item_${idx}`, r.message.name);
+                        parent_dialog.set_value(`item_${idx}`, r.message);
                         parent_dialog.set_value(`account_${idx}`, values.expense_account);
                         frappe.show_alert({
                             message: __('Item creato con successo'),

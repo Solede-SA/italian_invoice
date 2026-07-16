@@ -209,6 +209,36 @@ def save_item_supplier_mappings(mappings, supplier_name):
 		item_doc.save(ignore_permissions=True)
 
 
+@frappe.whitelist()
+def create_supplier_item(item_name, item_group, uom, expense_account, company, supplier, supplier_part_no):
+	"""
+	Crea un Item di acquisto non-stock associato al fornitore.
+	Chiamata dal dialog 'Crea Nuovo Item' delle fatture passive.
+	"""
+	item = frappe.get_doc({
+		"doctype": "Item",
+		"item_code": item_name,
+		"item_name": item_name,
+		"item_group": item_group,
+		"description": item_name,
+		"stock_uom": uom,
+		"is_stock_item": 0,
+		"is_sales_item": 0,
+		"is_purchase_item": 1,
+		"item_defaults": [{
+			"company": company,
+			"expense_account": expense_account,
+			"default_supplier": supplier,
+		}],
+		"supplier_items": [{
+			"supplier": supplier,
+			"supplier_part_no": _normalize_part_no(supplier_part_no),
+		}],
+	})
+	item.insert()
+	return item.name
+
+
 def _get_supplier_items(supplier_name):
 	"""Ottieni tutti gli Item associati al fornitore (via Item Supplier + Item Default)."""
 	# Item da Item Supplier
