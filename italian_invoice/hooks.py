@@ -4,7 +4,8 @@ app_publisher = "Solede SA"
 app_description = "Gestione della Fatturazione Elettronica in Italia"
 app_email = "info@solede.com"
 app_license = "AGPLv3"
-# required_apps = []
+# regional override su Sales Invoice (overrides/regional_italy, import di modulo)
+required_apps = ["erpnext"]
 
 # Includes in <head>
 # ------------------
