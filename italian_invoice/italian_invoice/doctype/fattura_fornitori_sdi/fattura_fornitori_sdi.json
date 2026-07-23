@@ -17,7 +17,9 @@
   "uuid",
   "dati_fattura",
   "company",
-  "via_webhook"
+  "via_webhook",
+  "conservata",
+  "data_conservazione"
  ],
  "fields": [
   {
@@ -105,6 +107,19 @@
    "in_standard_filter": 1,
    "label": "Fattura",
    "options": "Purchase Invoice"
+  },
+  {
+   "default": "0",
+   "fieldname": "conservata",
+   "fieldtype": "Check",
+   "label": "Conservata",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_conservazione",
+   "fieldtype": "Datetime",
+   "label": "Data Conservazione",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

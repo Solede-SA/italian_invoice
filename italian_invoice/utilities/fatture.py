@@ -3,7 +3,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import cstr
+from frappe.utils import convert_utc_to_system_timezone, cstr, get_datetime
 from frappe.utils.file_manager import remove_file
 
 from italian_invoice.validation import ValidationErrorFormatter, XMLInvoiceValidator
@@ -1316,6 +1316,26 @@ def identify_company_from_webhook_data(data):
 	frappe.throw("Impossibile identificare la Company dai dati webhook")
 
 
+def register_legal_storage_on_supplier_invoice(fattura_passiva_name, receipt):
+	"""Registra la ricevuta di conservazione su una fattura passiva.
+
+	Il ciclo passivo non ha Transazione SDI: la ricevuta va marcata sulla
+	Fattura Fornitori SDI identificata dall'UUID del webhook. La priorità dei
+	campi timestamp è la stessa del ciclo attivo (handle_notification del
+	provider): receipt_received_at, poi updated_at.
+	"""
+	doc = frappe.get_doc("Fattura Fornitori SDI", fattura_passiva_name)
+	doc.conservata = 1
+	# Timestamp ISO con timezone → datetime naive nel fuso del sito (MariaDB).
+	ricevuta_alle = get_datetime(receipt.get("receipt_received_at") or receipt["updated_at"])
+	doc.data_conservazione = convert_utc_to_system_timezone(ricevuta_alle).replace(tzinfo=None)
+	doc.save()
+	return {
+		"success": True,
+		"message": f"Conservazione registrata su {fattura_passiva_name}",
+	}
+
+
 def handle_sdi_webhook(endpoint, data):
 	"""
 	Router centrale per webhook SDI
@@ -1359,6 +1379,15 @@ def handle_sdi_webhook(endpoint, data):
 			)
 
 			if not transazioni:
+				if endpoint == "legal_storage_receipt":
+					# Le ricevute di conservazione arrivano anche per il ciclo passivo.
+					fattura_passiva = frappe.db.get_value(
+						"Fattura Fornitori SDI", {"uuid": uuid}, "name"
+					)
+					if fattura_passiva:
+						return register_legal_storage_on_supplier_invoice(
+							fattura_passiva, data.get("data", data)
+						)
 				frappe.throw(f"Transazione SDI non trovata per UUID: {uuid}")
 
 			# Ottieni la company dalla fattura collegata
