@@ -3,6 +3,7 @@
  "custom_fields": [
   {
    "dt": "Delivery Note",
+   "module": "Italian Invoice",
    "label": "Billing Gap",
    "fieldname": "custom_billing_gap",
    "fieldtype": "Currency",
