@@ -1,23 +1,12 @@
 """Basic tests for Italian Invoice app."""
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 
-# Ignore these doctypes as they are created by Company itself
-test_ignore = ["Account", "Cost Center", "Payment Terms Template", "Salary Component", "Warehouse"]
-
-# Ensure these doctypes have test records before running tests
-test_dependencies = [
-	"Warehouse Type",
-	"UOM",
-	"Customer Group",
-	"Supplier Group",
-	"Territory",
-	"Fiscal Year",
-]
+from italian_invoice.tests.fixtures import ensure_test_company
 
 
-class TestBasicFunctionality(FrappeTestCase):
+class TestBasicFunctionality(IntegrationTestCase):
 	"""Test basic app functionality."""
 
 	def test_app_installed(self):
@@ -36,27 +25,7 @@ class TestBasicFunctionality(FrappeTestCase):
 
 	def test_company_custom_fields(self):
 		"""Test that custom fields are properly added to Company."""
-		# Create required master data first
-		for wh_type in ["Transit", "Regular", "Fixed Asset"]:
-			if not frappe.db.exists("Warehouse Type", wh_type):
-				frappe.get_doc({"doctype": "Warehouse Type", "name": wh_type}).insert(ignore_permissions=True)
-
-		# Create a minimal test company to verify custom field exists
-		# Use Switzerland to avoid ERPNext Italy regional setup conflicts
-		if not frappe.db.exists("Company", "_Test Italian Invoice Company"):
-			company = frappe.get_doc(
-				{
-					"doctype": "Company",
-					"company_name": "_Test Italian Invoice Company",
-					"abbr": "_TIIC",
-					"default_currency": "EUR",
-					"country": "Switzerland",
-					"custom_codice_sistema_interscambio": "0000000",
-				}
-			)
-			company.insert(ignore_permissions=True)
-
-		company = frappe.get_doc("Company", "_Test Italian Invoice Company")
+		company = frappe.get_doc("Company", ensure_test_company())
 
 		self.assertTrue(
 			hasattr(company, "custom_codice_sistema_interscambio"),

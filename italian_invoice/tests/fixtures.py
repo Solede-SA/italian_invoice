@@ -53,3 +53,23 @@ def _override_company_test_records():
 		return records
 
 	frappe.get_test_records = patched_get_test_records
+
+
+TEST_COMPANY = "_Test Italian Invoice Company"
+
+
+def ensure_test_company():
+	"""Societa' di test svizzera (niente validazioni regionali Italia), idempotente.
+
+	I Warehouse Type che Company.on_update richiede li crea before_tests.
+	"""
+	if not frappe.db.exists("Company", TEST_COMPANY):
+		frappe.get_doc({
+			"doctype": "Company",
+			"company_name": TEST_COMPANY,
+			"abbr": "_TIIC",
+			"default_currency": "EUR",
+			"country": "Switzerland",
+			"custom_codice_sistema_interscambio": "0000000",
+		}).insert(ignore_permissions=True)
+	return TEST_COMPANY

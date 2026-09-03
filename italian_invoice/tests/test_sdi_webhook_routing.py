@@ -1,7 +1,7 @@
 """Test routing webhook SDI: ricevute di conservazione per fatture passive."""
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 
 from italian_invoice.utilities.fatture import handle_sdi_webhook
 
@@ -22,7 +22,7 @@ def _receipt_payload(uuid):
 	}
 
 
-class TestLegalStorageReceiptRouting(FrappeTestCase):
+class TestLegalStorageReceiptRouting(IntegrationTestCase):
 	def test_receipt_per_fattura_passiva_registra_conservazione(self):
 		fattura = frappe.get_doc({
 			"doctype": "Fattura Fornitori SDI",

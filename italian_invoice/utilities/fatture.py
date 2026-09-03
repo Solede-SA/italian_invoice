@@ -1443,13 +1443,13 @@ def handle_sdi_webhook(endpoint, data):
 
 @frappe.whitelist()
 def get_xml(docname, doctype):
+	# Una bozza può avere un nome provvisorio (BOZZA-…): non deve mai arrivare allo SDI.
+	if frappe.db.get_value(doctype, docname, "docstatus") != 1:
+		frappe.throw(_("Solo una fattura confermata può essere inviata al Sistema di Interscambio."))
+
 	file_path = validate_invoice(docname, doctype)
 	file_name = file_path.split("/")[-1]
 	full_path = frappe.get_site_path("private", "files", file_name)
 
-	# Leggi il contenuto del file XML
 	with open(full_path, encoding="utf-8") as file:
-		xml_content = file.read()
-
-	print("xml", xml_content)
-	return xml_content
+		return file.read()

@@ -239,10 +239,15 @@ doctype_js = {
 doc_events = {
 	"Sales Invoice": {
 		"before_naming": "italian_invoice.crud_events.sales_invoice.before_naming.execute",
+		"autoname": "italian_invoice.crud_events.sales_invoice.numerazione.autoname",
 		"before_save": "italian_invoice.crud_events.sales_invoice.before_save.execute",
 		"on_cancel": "italian_invoice.crud_events.sales_invoice.on_cancel.execute",
 		"validate": "italian_invoice.crud_events.sales_invoice.validate.execute",
-		"before_submit": "italian_invoice.crud_events.sales_invoice.before_submit.execute",
+		"before_submit": [
+			"italian_invoice.crud_events.sales_invoice.before_submit.execute",
+			# Numero definitivo solo dopo le validazioni: il lock sulla serie dura meno.
+			"italian_invoice.crud_events.sales_invoice.numerazione.before_submit",
+		],
 	},
 	"Payment Entry": {
 		"validate": [
