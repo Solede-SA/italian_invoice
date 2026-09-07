@@ -17,6 +17,7 @@ from frappe.model.rename_doc import (
 	rename_versions,
 	update_attachments,
 )
+from frappe.utils import getdate
 from frappe.utils.global_search import delete_for_document
 
 PREFISSO_BOZZA = "BOZZA-"
@@ -28,6 +29,21 @@ def autoname(doc, method=None):
 	if not doc.company or not frappe.get_cached_value("Company", doc.company, "custom_numero_alla_conferma"):
 		return
 	doc.name = make_autoname(PREFISSO_BOZZA + doc.naming_series + ".#####", doc=doc)
+
+
+def before_validate(doc, method=None):
+	"""Bozza confermata in un giorno successivo: le scadenze seguono la data documento.
+
+	ERPNext riporta posting_date a oggi ad ogni validate (set_posting_time=0), ma due_date e
+	le righe payment_schedule restano al giorno della bozza → "Due Date cannot be before
+	Posting Date" (es. pagamento Stripe riuscito al retry, conferma manuale dopo giorni).
+	"""
+	if not (doc.name or "").startswith(PREFISSO_BOZZA) or doc.get("set_posting_time"):
+		return
+	oggi = getdate()
+	for riga in [doc, *doc.get("payment_schedule")]:
+		if riga.due_date and getdate(riga.due_date) < oggi:
+			riga.due_date = oggi
 
 
 def before_submit(doc, method=None):

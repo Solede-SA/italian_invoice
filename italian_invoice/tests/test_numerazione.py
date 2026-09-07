@@ -5,7 +5,7 @@ from erpnext.accounts.utils import get_fiscal_years
 from frappe.model.dynamic_links import invalidate_distinct_link_doctypes
 from frappe.model.naming import NamingSeries
 from frappe.tests import IntegrationTestCase
-from frappe.utils import today
+from frappe.utils import add_days, getdate, today
 
 from italian_invoice.crud_events.sales_invoice.numerazione import PREFISSO_BOZZA
 from italian_invoice.tests.fixtures import TEST_COMPANY as COMPANY, ensure_test_company
@@ -110,6 +110,27 @@ class TestNumerazione(IntegrationTestCase):
 		)
 		self.assertIn("nota sulla bozza", commenti)
 		self.assertTrue(any(c.startswith("Numerata") for c in commenti), commenti)
+
+	def _bozza_di_ieri(self):
+		"""Bozza creata ieri (posting, scadenza e riga payment_schedule) e confermata oggi."""
+		bozza = self._bozza()
+		ieri = add_days(today(), -1)
+		bozza.db_set({"posting_date": ieri, "due_date": ieri})
+		bozza.payment_schedule[0].db_set("due_date", ieri)
+		return bozza
+
+	def test_bozza_confermata_giorni_dopo_scadenza_segue_la_data(self):
+		bozza = self._bozza_di_ieri()
+		bozza.submit()
+		self.assertEqual(getdate(bozza.posting_date), getdate(today()))
+		self.assertEqual(getdate(bozza.due_date), getdate(today()))
+		self.assertEqual(getdate(bozza.payment_schedule[0].due_date), getdate(today()))
+
+	def test_fattura_gia_numerata_conserva_validazione_scadenza(self):
+		self._flag(0)
+		fattura = self._bozza_di_ieri()
+		with self.assertRaisesRegex(frappe.ValidationError, "Due Date"):
+			fattura.submit()
 
 	def test_bozza_eliminata_non_lascia_buchi(self):
 		prima_bozza = self._bozza()
