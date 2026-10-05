@@ -1,24 +1,3 @@
-const updateTaxRate = (frm) => {
-  if (frm.doc.taxes && frm.doc.taxes.length > 0) {
-    frm.doc.taxes.forEach((tax) => {
-      let itemWiseTaxDetail = tax.item_wise_tax_detail;
-      if (itemWiseTaxDetail) {
-        if (typeof itemWiseTaxDetail === "string") {
-          itemWiseTaxDetail = JSON.parse(itemWiseTaxDetail);
-        }
-        Object.keys(itemWiseTaxDetail).forEach((itemCode) => {
-          let taxDetails = itemWiseTaxDetail[itemCode];
-          let taxRate = taxDetails[0];
-          let item = frm.doc.items.find(i => i.item_code === itemCode);
-          if (item) {
-            item.tax_rate = taxRate;
-          }
-        });
-      }
-    });
-  }
-};
-
 frappe.ui.form.on("Purchase Invoice", {
   refresh: (frm) => {
     if (frm.doc.docstatus == 0 || frm.doc.docstatus == 1) {
@@ -69,9 +48,6 @@ frappe.ui.form.on("Purchase Invoice", {
       frm.set_value("taxes_and_charges", "");
     }
     frm.refresh_field("taxes_and_charges");
-  },
-  validate: (frm) => {
-    updateTaxRate(frm);
   },
 });
 

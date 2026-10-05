@@ -183,14 +183,7 @@
                     </ScontoMaggiorazione>
                 {%- endif %} #}
                 <PrezzoTotale>{{ macros.format_float(net_rate|round(float_precision)*item.qty|abs) }}</PrezzoTotale>
-                {% set aliquota_iva = item.tax_rate  %}
-                {% if doc.type_of_document in ['TD18'] %}
-                    <AliquotaIVA>{{ macros.format_float(22) }}</AliquotaIVA>
-                {% elif doc.type_of_document in ['TD19', 'TD17']  %}
-                    <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
-                {% else %}
-                    <AliquotaIVA>{{ macros.format_float(aliquota_iva) }}</AliquotaIVA>
-                {% endif %}
+                <AliquotaIVA>{{ macros.format_float(item.tax_rate) }}</AliquotaIVA>
                 {%- if item.custom_motivo_esenzione_iva %}
                     <Natura>{{ item.custom_motivo_esenzione_iva }}</Natura>
                     {%- if item.custom_motivo_esenzione_iva in ['N3.5'] %}

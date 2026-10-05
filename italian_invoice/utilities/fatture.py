@@ -3,10 +3,13 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import convert_utc_to_system_timezone, cstr, get_datetime
+from frappe.utils import convert_utc_to_system_timezone, cstr, flt, get_datetime
 from frappe.utils.file_manager import remove_file
 
 from italian_invoice.validation import ValidationErrorFormatter, XMLInvoiceValidator
+
+# Trattino morbido, spazio unificatore, spazi a larghezza zero, BOM
+INVISIBLE_CHARS = re.compile("[\u00ad\u00a0\u200b-\u200d\ufeff]")
 
 # Costanti per percorsi JSON fatture elettroniche
 JSON_PATHS = {
@@ -378,7 +381,19 @@ def get_party_name(party):
 	return name
 
 
+def check_invisible_chars(party):
+	"""Caratteri invisibili incollati da PDF o siti finirebbero in IdCodice."""
+	for fieldname in ("tax_id", "fiscal_code"):
+		if INVISIBLE_CHARS.search(party.get(fieldname) or ""):
+			frappe.throw(
+				_("{0} {1}: il campo {2} contiene caratteri invisibili. Riscriverlo a mano in anagrafica.").format(
+					_(party.doctype), party.name, _(party.meta.get_label(fieldname))
+				)
+			)
+
+
 def get_party_data(party, invoice):
+	check_invisible_chars(party)
 	billing_address = get_billing_address(party, invoice)
 
 	party_data = {
@@ -471,6 +486,7 @@ def get_invoice_data(doc):
 	cessionario_committente = get_cessionario_committente(doc)
 	cedente_prestatore = get_cedente_prestatore(doc)
 	e_invoice_items = [item for item in doc.items]
+	set_line_tax_rates(doc, e_invoice_items)
 
 	# Add optional cbmedical fields if they exist
 	for item in e_invoice_items:
@@ -490,6 +506,7 @@ def get_invoice_data(doc):
 
 	vat_collectability = doc.vat_collectability.split("-")[0] if hasattr(doc, "vat_collectability") else "I"
 	tax_data = get_invoice_summary(e_invoice_items, doc.taxes, doc)
+	set_line_exemption_reasons(e_invoice_items, tax_data)
 
 	conversion_rate = doc.conversion_rate if hasattr(doc, "conversion_rate") else 1
 
@@ -686,11 +703,49 @@ def get_invoice_data(doc):
 #     zip_stream.close()
 
 
-def get_invoice_summary(items, taxes, doc=None):
+def is_vat_tax(tax):
+	"""Esclusi bollo (importo fisso) e storno Deduct del reverse charge."""
+	return tax.charge_type != "Actual" and tax.get("add_deduct_tax") != "Deduct"
+
+
+def set_line_tax_rates(doc, items):
+	"""AliquotaIVA di riga da item_wise_tax_details, come DatiRiepilogo: sulla
+	Purchase Invoice ERPNext non compila tax_rate. Solo in memoria."""
+	vat_rows = {tax.name for tax in doc.taxes if is_vat_tax(tax)}
+	for item in items:
+		rates = {
+			flt(row.rate)
+			for row in doc.item_wise_tax_details
+			if row.item_row == item.name and row.tax_row in vat_rows and row.rate
+		}
+		if len(rates) > 1:
+			frappe.throw(
+				_("Riga {0} ({1}): più aliquote IVA ({2}), la fattura elettronica ne ammette una per riga").format(
+					item.idx, item.item_code, ", ".join(cstr(rate) for rate in sorted(rates))
+				)
+			)
+		item.tax_rate = rates.pop() if rates else 0.0
+
+
+def set_line_exemption_reasons(items, tax_data):
+	"""Natura delle righe a 0% senza una propria: quella del riepilogo (SdI 00400)."""
+	zero_rate_summary = next((data for rate, data in tax_data.items() if not flt(rate)), {})
+	for item in items:
+		if item.tax_rate or item.get("custom_motivo_esenzione_iva"):
+			continue
+		if not zero_rate_summary.get("tax_exemption_reason"):
+			frappe.throw(
+				_("Riga {0} ({1}): IVA a 0% senza Natura. Impostare il motivo di esenzione sulla riga tasse.").format(
+					item.idx, item.item_code
+				)
+			)
+		item.custom_motivo_esenzione_iva = zero_rate_summary["tax_exemption_reason"]
+
+
+def get_invoice_summary(items, taxes, doc):
 	summary_data = frappe._dict()
 	for tax in taxes:
-		# Include only VAT charges.
-		if tax.charge_type == "Actual":
+		if not is_vat_tax(tax):
 			continue
 
 		# Charges to appear as items in the e-invoice.
@@ -760,35 +815,20 @@ def get_invoice_summary(items, taxes, doc=None):
 				)
 
 		else:
-			add_deduct_tax = "Add"
-			if hasattr(tax, "add_deduct_tax"):
-				add_deduct_tax = tax.add_deduct_tax
+			tax_detail_rows = [
+				row for row in doc.item_wise_tax_details if row.tax_row == tax.name and row.rate == tax.rate
+			]
+			if not tax_detail_rows:
+				frappe.throw(f"La riga tasse '{tax.description}' non ha il dettaglio per item. Salvare la fattura prima di validare.")
 
-			if add_deduct_tax == "Add":
-				# Get item-wise tax details from child table (ERPNext v16+)
-				tax_detail_rows = []
-				if doc:
-					tax_detail_rows = [
-						row for row in doc.get("item_wise_tax_details", [])
-						if row.tax_row == tax.name and row.rate == tax.rate
-					]
+			summary = summary_data.setdefault(cstr(tax.rate), {"tax_amount": 0.0, "taxable_amount": 0.0})
+			for detail_row in tax_detail_rows:
+				summary["tax_amount"] += detail_row.amount
+				summary["taxable_amount"] += detail_row.taxable_amount
 
-				if not tax_detail_rows:
-					frappe.throw(f"La riga tasse '{tax.description}' non ha il dettaglio per item. Salvare la fattura prima di validare.")
-
-				for detail_row in tax_detail_rows:
-					key = cstr(tax.rate)
-					if not summary_data.get(key):
-						summary_data.setdefault(key, {"tax_amount": 0.0, "taxable_amount": 0.0})
-					summary_data[key]["tax_amount"] += detail_row.amount
-					summary_data[key]["taxable_amount"] += detail_row.taxable_amount
-
-				for item in items:
-					key = cstr(tax.rate)
-					if item.get("charges"):
-						if not summary_data.get(key):
-							summary_data.setdefault(key, {"taxable_amount": 0.0})
-						summary_data[key]["taxable_amount"] += item.taxable_amount
+			for item in items:
+				if item.get("charges"):
+					summary["taxable_amount"] += item.taxable_amount
 
 	return summary_data
 
