@@ -369,8 +369,8 @@ function check_due_date_consistency(frm) {
                 // Mostra un indicatore di warning
                 frm.dashboard.add_comment(
                     __('Due date ({0}) differs from payment schedule maximum date ({1})', [
-                        frappe.format_date(frm.doc.due_date),
-                        frappe.format_date(max_schedule_date)
+                        frappe.datetime.str_to_user(frm.doc.due_date),
+                        frappe.datetime.str_to_user(max_schedule_date)
                     ]),
                     'orange'
                 );
