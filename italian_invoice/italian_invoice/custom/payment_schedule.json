@@ -273,7 +273,7 @@
    "description": null,
    "docstatus": 0,
    "dt": "Payment Schedule",
-   "fetch_from": "bank_account.swift_number",
+   "fetch_from": null,
    "fetch_if_empty": 0,
    "fieldname": "bank_account_swift_number",
    "fieldtype": "Data",

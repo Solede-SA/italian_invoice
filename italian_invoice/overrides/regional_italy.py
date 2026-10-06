@@ -15,14 +15,16 @@ Partita IVA è presente.
 import frappe
 from frappe import _
 
-from erpnext.regional.italy.utils import validate_address
+from erpnext.regional.italy.utils import set_payment_schedule_swift_number, validate_address
 
 
 # Copia adattata di erpnext.regional.italy.utils.sales_invoice_validate:
 # tenere allineata a monte, tranne il blocco marcato SOLEDE.
 def sales_invoice_validate(doc):
+	set_payment_schedule_swift_number(doc)
+
 	# Validate company
-	if doc.doctype != "Sales Invoice":
+	if doc.doctype != "Sales Invoice" or doc.is_opening == "Yes":
 		return
 
 	if not doc.company_address:
