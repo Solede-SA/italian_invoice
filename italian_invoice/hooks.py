@@ -333,10 +333,6 @@ fixtures = [
 		"filters": [["app", "=", "italian_invoice"]],
 	},
 	{
-		"dt": "Workspace Sidebar",
-		"filters": [["app", "=", "italian_invoice"]],
-	},
-	{
 		"dt": "Number Card",
 		"filters": [["module", "=", "Italian Invoice"]],
 	},

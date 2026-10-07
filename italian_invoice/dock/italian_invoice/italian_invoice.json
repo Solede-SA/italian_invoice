@@ -1,0 +1,24 @@
+{
+ "app": "italian_invoice",
+ "creation": "2026-10-07 11:38:35.004631",
+ "docstatus": 0,
+ "doctype": "Dock",
+ "idx": 0,
+ "items": [
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "receipt-text",
+   "link_to": "Fatturazione Elettronica",
+   "link_type": "Sidebar",
+   "title": "Fatturazione Elettronica"
+  }
+ ],
+ "modified": "2026-10-07 12:01:09.966666",
+ "modified_by": "Administrator",
+ "mount_on": "erpnext",
+ "name": "italian_invoice",
+ "owner": "Administrator",
+ "standard": 1,
+ "user": ""
+}
