@@ -392,6 +392,15 @@ def check_invisible_chars(party):
 			)
 
 
+def get_xml_fiscal_code(party):
+	"""CodiceFiscale del cessionario per l'XML, niente se è la copia della Partita IVA. Lo SDI verifica che Partita IVA e
+	codice fiscale siano dello stesso soggetto (00324): per ditte individuali e associazioni con Partita
+	IVA il codice fiscale è un altro, e la copia fa scartare la fattura."""
+	if party.fiscal_code and party.fiscal_code == (party.tax_id or "").removeprefix("IT"):
+		return None
+	return party.fiscal_code
+
+
 def get_party_data(party, invoice):
 	check_invisible_chars(party)
 	billing_address = get_billing_address(party, invoice)
@@ -450,6 +459,7 @@ def get_cessionario_committente(doc):
 	print("cessionario", cessionario)
 
 	cessionario_committente = get_party_data(cessionario, doc)
+	cessionario_committente["fiscal_code"] = get_xml_fiscal_code(cessionario)
 	return cessionario_committente
 
 
