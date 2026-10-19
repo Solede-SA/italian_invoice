@@ -401,6 +401,29 @@ def get_xml_fiscal_code(party):
 	return party.fiscal_code
 
 
+def get_xml_causale(doc):
+	"""Causale per chi riceve la fattura: «già pagata» quando non resta niente da incassare. L'XML si
+	rigenera a ogni invio, quindi vale lo stato del pagamento al momento dell'invio."""
+	if doc.doctype == "Sales Invoice" and not doc.is_return and doc.outstanding_amount == 0:
+		return "Fattura già pagata. Non effettuare pagamenti."
+	return None
+
+
+def get_xml_bank_account(payment_term, custom_bank_account):
+	"""Conto del DettaglioPagamento, solo per il bonifico (MP05). Con la carta (MP08) l'IBAN fa credere a
+	chi riceve la fattura di doverla ancora pagare (SINV/26/00223: il Desk mette il conto predefinito su
+	ogni bozza aperta). ABI e CAB esistono solo per i conti italiani."""
+	name = payment_term.bank_account or custom_bank_account
+	if payment_term.mode_of_payment_code.split("-")[0] != "MP05" or not name:
+		return None
+	bank_account = frappe.db.get_value("Bank Account", name, ["bank", "iban", "swift_number"], as_dict=True)
+	if not bank_account.iban:
+		frappe.throw(_("Il conto {0} non ha l'IBAN, che serve al bonifico nella fattura elettronica.").format(name))
+	if bank_account.iban.startswith("IT"):
+		bank_account.abi, bank_account.cab = bank_account.iban[5:10], bank_account.iban[10:15]
+	return bank_account
+
+
 def get_party_data(party, invoice):
 	check_invisible_chars(party)
 	billing_address = get_billing_address(party, invoice)
@@ -505,6 +528,9 @@ def get_invoice_data(doc):
 		except Exception:
 			item.custom_rdm = None
 
+	for payment_term in doc.payment_schedule:
+		payment_term.xml_bank_account = get_xml_bank_account(payment_term, doc.get("custom_bank_account"))
+
 	tipo_di_documento = frappe.get_doc("Tipologia di documento e-Invoice", doc.custom_tipo_di_documento)
 
 	if doc.return_against:
@@ -524,7 +550,7 @@ def get_invoice_data(doc):
 
 	data = {
 		"conversion_rate": conversion_rate,
-		"causale": doc.doctype,
+		"causale": get_xml_causale(doc),
 		"transmission_format_code": transmission_format_code,
 		"progressive_number": get_progressive_name(doc),
 		"type_of_document": tipo_di_documento.codice,
@@ -549,7 +575,6 @@ def get_invoice_data(doc):
 		"tax_data": tax_data,
 		"vat_collectability": vat_collectability,
 		"payment_schedule": doc.payment_schedule,
-		"custom_bank_account": doc.custom_bank_account if hasattr(doc, "custom_bank_account") else None,
 		"apply_discount_on": doc.apply_discount_on,
 		# "stamp_duty": doc.stamp_duty,
 	}

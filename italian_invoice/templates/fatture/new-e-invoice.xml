@@ -123,7 +123,9 @@
                     </ScontoMaggiorazione>
                 {%- endif %} #}
                 <ImportoTotaleDocumento>{{ macros.format_float(doc.grand_total|flt) }}</ImportoTotaleDocumento>
+                {% if doc.causale %}
                 <Causale>{{ doc.causale }}</Causale>
+                {% endif %}
             </DatiGeneraliDocumento>
             {{ macros.render_dati_ordine_acquisto(doc.e_invoice_items) }}
             {%if doc.bill_no %}
@@ -242,23 +244,16 @@
                     {% else %}
                         <ImportoPagamento>{{ macros.format_float(payment_term.payment_amount * doc.conversion_rate) }}</ImportoPagamento>
                     {% endif %}
-                    {% if payment_term.bank_account %}
-
-                        <IstitutoFinanziario>{{ payment_term.bank_account_name }}</IstitutoFinanziario>
-                        <IBAN>{{ payment_term.bank_account_iban }}</IBAN>
-                        <ABI>{{ payment_term.bank_account_iban[5:10] }}</ABI>
-                        <CAB>{{ payment_term.bank_account_iban[10:15] }}</CAB>
-
-                    {% else %}
-                        {% if doc.custom_bank_account %}
-                            {% set bank_account = frappe.get_doc ("Bank Account", doc.custom_bank_account) %}
-                            <IstitutoFinanziario>{{ bank_account.account_name }}</IstitutoFinanziario>
-                            <IBAN>{{ bank_account.iban }}</IBAN>
-                            <ABI>{{ bank_account.iban[5:10] }}</ABI>
-                            <CAB>{{ bank_account.iban[10:15] }}</CAB>
-                            {% if bank_account.swift_number%}
-                                <BIC>{{ bank_account.swift_number }}</BIC>
-                            {% endif %}
+                    {% set bank_account = payment_term.xml_bank_account %}
+                    {% if bank_account %}
+                        <IstitutoFinanziario>{{ bank_account.bank }}</IstitutoFinanziario>
+                        <IBAN>{{ bank_account.iban }}</IBAN>
+                        {% if bank_account.abi %}
+                            <ABI>{{ bank_account.abi }}</ABI>
+                            <CAB>{{ bank_account.cab }}</CAB>
+                        {% endif %}
+                        {% if bank_account.swift_number %}
+                            <BIC>{{ bank_account.swift_number }}</BIC>
                         {% endif %}
                     {% endif %}
                 </DettaglioPagamento>
