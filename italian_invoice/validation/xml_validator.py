@@ -210,6 +210,9 @@ class XMLInvoiceValidator:
 			# Valida codice destinatario
 			self._validate_recipient_code(root, ns)
 
+			# Natura generica N2/N3/N6 (scarto SdI 00445)
+			self._validate_natura(root, ns)
+
 		except Exception as e:
 			logger.warning(f"Errore in validazioni business: {str(e)}")
 
@@ -313,6 +316,25 @@ class XMLInvoiceValidator:
 					)
 		except Exception:
 			pass  # Non critico
+
+	def _validate_natura(self, root, ns):
+		"""N2, N3 e N6 senza sottocodice: l'XSD li accetta, SdI li scarta (00445)"""
+		from italian_invoice.validation.natura import NATURE_GENERICHE
+
+		# Nel tracciato FatturaPA solo la radice ha il namespace: gli elementi figli no.
+		for elem in root.xpath("//*[local-name()='Natura']"):
+			natura = (elem.text or "").strip()
+			if natura in NATURE_GENERICHE:
+				self.errors.append(
+					{
+						"type": "BUSINESS_RULE",
+						"severity": "error",
+						"message": f"Natura {natura} generica: dal 1/1/2021 SdI scarta la fattura (errore 00445)",
+						"field": "Natura",
+						"path": elem.getparent().tag.split("}")[-1],
+						"suggestion": "Usare il sottocodice (N2.1, N2.2, N3.1-N3.6, N6.1-N6.9) nel Motivo esenzione IVA",
+					}
+				)
 
 	def _validate_recipient_code(self, root, ns):
 		"""Valida codice destinatario"""
