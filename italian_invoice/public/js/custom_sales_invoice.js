@@ -263,20 +263,6 @@ frappe.ui.form.on("Sales Invoice", {
             }
         });
     }
-
-    if (frm.doc.taxes) {
-      frm.doc.taxes.forEach((tax, idx) => {
-        if (tax.base_tax_amount == 0 && tax.custom_motivo_esenzione_iva === undefined) {
-          frappe.throw(__("<b>Motivo esenzione IVA</b> mancante nella tassa {0}", [idx + 1]));
-        }
-        if (tax.custom_motivo_esenzione_iva !== undefined) {
-          tax.tax_exemption_reason = "N3-Non Imponibili"
-        }
-
-
-      });
-    }
-
   },
   // after_save: (frm) => {
   //   frm.doc.items.forEach((item) => {

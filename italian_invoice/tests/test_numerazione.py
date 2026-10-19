@@ -7,6 +7,7 @@ from frappe.model.naming import NamingSeries
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, getdate, today
 
+from italian_invoice.crud_events.sales_invoice import before_naming
 from italian_invoice.crud_events.sales_invoice.numerazione import PREFISSO_BOZZA
 from italian_invoice.tests.fixtures import TEST_COMPANY as COMPANY, ensure_test_company
 from italian_invoice.utilities.fatture import get_unamended_name, get_xml
@@ -43,12 +44,12 @@ def _crea_anagrafiche():
 	)
 
 
-def _serie_corrente(naming_series="SINV/.YY./"):
+def _serie_corrente(naming_series):
 	serie = NamingSeries(naming_series)
 	return serie.get_prefix(), serie.get_current_value()
 
 
-def _prossimo(naming_series="SINV/.YY./"):
+def _prossimo(naming_series):
 	prefisso, corrente = _serie_corrente(naming_series)
 	return f"{prefisso}{corrente + 1:05d}"
 
@@ -66,9 +67,9 @@ class TestNumerazione(IntegrationTestCase):
 	def _flag(self, valore):
 		frappe.db.set_value("Company", COMPANY, "custom_numero_alla_conferma", valore)
 
-	def _bozza(self, **valori):
+	def _documento(self, **valori):
 		qty = -1 if valori.get("is_return") else 1
-		doc = frappe.get_doc({
+		return frappe.get_doc({
 			"doctype": "Sales Invoice",
 			"company": COMPANY,
 			"customer": self.customer,
@@ -76,13 +77,29 @@ class TestNumerazione(IntegrationTestCase):
 			"items": [{"item_code": ITEM, "qty": qty, "rate": 100}],
 			**valori,
 		})
-		return doc.insert(ignore_permissions=True)
+
+	def _bozza(self, **valori):
+		return self._documento(**valori).insert(ignore_permissions=True)
+
+	def _serie(self, **valori):
+		"""Serie che i ganci before_naming del sito danno alla fattura: quello di italian_invoice e quelli
+		delle app installate dopo, che possono sostituirla (bookfit: serie per studio)."""
+		doc = self._documento(**valori)
+		doc.run_method("before_naming")
+		return doc.naming_series
+
+	def test_serie_di_italian_invoice(self):
+		fattura, nota = self._documento(), self._documento(is_return=1)
+		before_naming.execute(fattura)
+		before_naming.execute(nota)
+		self.assertEqual((fattura.naming_series, nota.naming_series), ("SINV/.YY./", "NCINV/.YY./"))
 
 	def test_bozza_nome_provvisorio_serie_intatta(self):
-		prefisso, prima = _serie_corrente()
+		serie = self._serie()
+		prefisso, prima = _serie_corrente(serie)
 		bozza = self._bozza()
 		self.assertTrue(bozza.name.startswith(PREFISSO_BOZZA + prefisso), bozza.name)
-		self.assertEqual(_serie_corrente()[1], prima)
+		self.assertEqual(_serie_corrente(serie)[1], prima)
 
 	def test_submit_assegna_numero_e_rinomina_tutto(self):
 		bozza = self._bozza()
@@ -94,7 +111,7 @@ class TestNumerazione(IntegrationTestCase):
 		}).insert(ignore_permissions=True)
 		# La mappa dei link dinamici è in cache per 12 ore: senza reset il Comment non verrebbe rinominato.
 		invalidate_distinct_link_doctypes("Comment", "reference_doctype", "Sales Invoice")
-		atteso = _prossimo()
+		atteso = _prossimo(bozza.naming_series)
 
 		bozza.submit()
 
@@ -135,21 +152,21 @@ class TestNumerazione(IntegrationTestCase):
 	def test_bozza_eliminata_non_lascia_buchi(self):
 		prima_bozza = self._bozza()
 		seconda = self._bozza()
-		atteso = _prossimo()
+		atteso = _prossimo(seconda.naming_series)
 		prima_bozza.delete()
 		seconda.submit()
 		self.assertEqual(seconda.name, atteso)
 
 	def test_nota_di_credito(self):
 		nota = self._bozza(is_return=1)
-		self.assertTrue(nota.name.startswith(PREFISSO_BOZZA + "NCINV/"), nota.name)
-		atteso = _prossimo("NCINV/.YY./")
+		self.assertTrue(nota.name.startswith(PREFISSO_BOZZA + _serie_corrente(nota.naming_series)[0]), nota.name)
+		atteso = _prossimo(nota.naming_series)
 		nota.submit()
 		self.assertEqual(nota.name, atteso)
 
 	def test_flag_spento_numero_alla_creazione(self):
 		self._flag(0)
-		atteso = _prossimo()
+		atteso = _prossimo(self._serie())
 		self.assertEqual(self._bozza().name, atteso)
 
 	def test_emenda_conserva_il_numero(self):

@@ -3,7 +3,7 @@
 L'override sostituisce la funzione di ERPNext (regional_overrides): se ERPNext la cambia, la copia
 resta indietro in silenzio. È già successo con ERPNext 16.50 (numero SWIFT delle scadenze di
 pagamento, fatture di apertura escluse). L'impronta qui sotto è quella dell'originale con cui la copia
-è stata allineata: quando cambia, riallineare la copia (tranne il blocco SOLEDE) e aggiornarla.
+è stata allineata: quando cambia, riallineare la copia (tranne i blocchi SOLEDE) e aggiornarla.
 """
 
 import hashlib
@@ -22,5 +22,5 @@ class TestRegionalOverride(UnitTestCase):
 			impronta,
 			IMPRONTA_ORIGINALE_ALLINEATA,
 			"ERPNext ha cambiato erpnext.regional.italy.utils.sales_invoice_validate: riallineare la copia "
-			"in italian_invoice/overrides/regional_italy.py (tranne il blocco SOLEDE) e aggiornare l'impronta.",
+			"in italian_invoice/overrides/regional_italy.py (tranne i blocchi SOLEDE) e aggiornare l'impronta.",
 		)

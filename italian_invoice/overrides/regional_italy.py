@@ -3,13 +3,17 @@
 Registrato in hooks.py via `regional_overrides` (meccanismo ufficiale ERPNext:
 `erpnext.allow_regional` usa l'override dell'ultima app installata).
 
-Unica differenza dall'originale: per i clienti Company NON Pubblica
-Amministrazione basta la Partita IVA OPPURE il Codice Fiscale — la fattura
-elettronica ammette il cessionario identificato dal solo Codice Fiscale
-(enti non commerciali senza Partita IVA: associazioni, condomini, ...).
-L'originale pretende sempre la Partita IVA e blocca l'inserimento della
-fattura. Il template new-e-invoice.xml emette IdFiscaleIVA solo se la
-Partita IVA è presente.
+Differenze dall'originale (blocchi marcati SOLEDE):
+- per i clienti Company NON Pubblica Amministrazione basta la Partita IVA
+  OPPURE il Codice Fiscale — la fattura elettronica ammette il cessionario
+  identificato dal solo Codice Fiscale (enti non commerciali senza Partita IVA:
+  associazioni, condomini, ...). L'originale pretende sempre la Partita IVA e
+  blocca l'inserimento della fattura. Il template new-e-invoice.xml emette
+  IdFiscaleIVA solo se la Partita IVA è presente.
+- le righe tasse allo 0% esigono `custom_motivo_esenzione_iva`, l'unico campo
+  da cui il template new-e-invoice.xml prende la Natura. L'originale esige il
+  vecchio Select `tax_exemption_reason` (nascosto, solo codici generici N1-N7),
+  che nella fattura elettronica non finisce.
 """
 
 import frappe
@@ -19,7 +23,7 @@ from erpnext.regional.italy.utils import set_payment_schedule_swift_number, vali
 
 
 # Copia adattata di erpnext.regional.italy.utils.sales_invoice_validate:
-# tenere allineata a monte, tranne il blocco marcato SOLEDE.
+# tenere allineata a monte, tranne i blocchi marcati SOLEDE.
 def sales_invoice_validate(doc):
 	set_payment_schedule_swift_number(doc)
 
@@ -94,11 +98,10 @@ def sales_invoice_validate(doc):
 		)
 	else:
 		for row in doc.taxes:
-			if row.rate == 0 and row.tax_amount == 0 and not row.tax_exemption_reason:
+			# SOLEDE: custom_motivo_esenzione_iva al posto di tax_exemption_reason (vedi docstring).
+			if row.rate == 0 and row.tax_amount == 0 and not row.custom_motivo_esenzione_iva:
 				frappe.throw(
-					_("Row {0}: Please set at Tax Exemption Reason in Sales Taxes and Charges").format(
-						row.idx
-					),
+					_("Riga tasse {0}: IVA a 0% senza Motivo esenzione IVA.").format(row.idx),
 					title=_("E-Invoicing Information Missing"),
 				)
 
