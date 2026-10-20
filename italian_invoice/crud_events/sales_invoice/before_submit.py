@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+from italian_invoice.validation.natura import righe_con_natura_generica
+
 
 def execute(doc, method=None):
 	"""Validazione fail-loud dei campi obbligatori per la fattura elettronica (SDI).
@@ -42,3 +44,13 @@ def execute(doc, method=None):
 
 	if customer.is_public_administration and not customer.custom_codice_univoco:
 		frappe.throw(_("Cliente PA {0}: Codice Destinatario (codice univoco IPA) mancante, obbligatorio per fatturare alla Pubblica Amministrazione.").format(doc.customer))
+
+	# Natura generica (N2, N3, N6) senza sottocodice: dal 1/1/2021 SdI scarta la fattura (00445).
+	righe = righe_con_natura_generica(doc)
+	if righe:
+		frappe.throw(
+			_("Natura IVA generica non più ammessa da SdI (scarto 00445): {0}. Usare il sottocodice (es. N2.1, N3.2, N6.3).").format(
+				", ".join(righe)
+			),
+			title=_("Natura IVA da completare"),
+		)
