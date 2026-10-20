@@ -4,33 +4,21 @@ Dal 1° gennaio 2021 (specifiche tecniche 1.6.1) SdI scarta le fatture con Natur
 senza sottocodice (errore 00445). Lo schema XSD li ammette ancora, quindi la validazione XSD
 da sola non basta. I record restano in «Motivo esenzione IVA» perché servono per importare
 fatture passive emesse prima del 2021.
+
+Si controlla solo custom_motivo_esenzione_iva: è il campo da cui il template prende la Natura.
+Il vecchio Select tax_exemption_reason non finisce nell'XML e resta pieno sui documenti esistenti.
 """
 
 NATURE_GENERICHE = frozenset({"N2", "N3", "N6"})
-
-
-def codice_natura(valore):
-	"""«N3-Non Imponibili» o «N3» → «N3»; vuoto → None."""
-	if not valore:
-		return None
-	return str(valore).split("-", 1)[0].strip().upper() or None
-
-
-def is_natura_generica(valore):
-	return codice_natura(valore) in NATURE_GENERICHE
 
 
 def righe_con_natura_generica(doc):
 	"""Righe articolo e righe tasse con Natura generica, come testo per il messaggio."""
 	righe = []
 	for item in doc.get("items") or []:
-		valore = item.get("custom_motivo_esenzione_iva")
-		if is_natura_generica(valore):
-			righe.append(f"articolo riga {item.idx} ({codice_natura(valore)})")
+		if item.get("custom_motivo_esenzione_iva") in NATURE_GENERICHE:
+			righe.append(f"articolo riga {item.idx} ({item.custom_motivo_esenzione_iva})")
 	for tax in doc.get("taxes") or []:
-		for campo in ("custom_motivo_esenzione_iva", "tax_exemption_reason"):
-			valore = tax.get(campo)
-			if is_natura_generica(valore):
-				righe.append(f"tasse riga {tax.idx} ({codice_natura(valore)})")
-				break
+		if tax.get("custom_motivo_esenzione_iva") in NATURE_GENERICHE:
+			righe.append(f"tasse riga {tax.idx} ({tax.custom_motivo_esenzione_iva})")
 	return righe
