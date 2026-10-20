@@ -121,24 +121,6 @@ class ValidationErrorFormatter:
 			html.append("</ul>")
 			html.append("</div>")
 
-		# Avvisi
-		if report["warnings"]:
-			html.append('<div class="validation-warnings" style="margin-top: 20px;">')
-			html.append("<h5>Avvisi (non bloccanti):</h5>")
-			html.append('<ul class="list-unstyled">')
-
-			for warning in report["warnings"]:
-				html.append('<li class="alert alert-warning" style="padding: 8px; margin: 3px 0;">')
-				html.append(f"<strong>⚠️ {cls._get_friendly_message(warning)}</strong>")
-
-				if warning.get("suggestion"):
-					html.append(f' - <span class="text-muted">{warning["suggestion"]}</span>')
-
-				html.append("</li>")
-
-			html.append("</ul>")
-			html.append("</div>")
-
 		# Sommario azioni
 		if not report["valid"]:
 			html.append('<div class="alert alert-info" style="margin-top: 20px;">')
@@ -165,7 +147,7 @@ class ValidationErrorFormatter:
 		else:
 			lines.append("❌ VALIDAZIONE FALLITA")
 			lines.append("=" * 50)
-			lines.append(f"Errori: {report['error_count']} | Avvisi: {report['warning_count']}")
+			lines.append(f"Errori: {report['error_count']}")
 
 		lines.append("")
 
@@ -181,16 +163,6 @@ class ValidationErrorFormatter:
 				if error.get("suggestion"):
 					lines.append(f"   → {error['suggestion']}")
 				lines.append("")
-
-		# Avvisi
-		if report["warnings"]:
-			lines.append("AVVISI:")
-			lines.append("-" * 30)
-			for warning in report["warnings"]:
-				lines.append(f"⚠ {cls._get_friendly_message(warning)}")
-				if warning.get("suggestion"):
-					lines.append(f"  → {warning['suggestion']}")
-			lines.append("")
 
 		return "\n".join(lines)
 

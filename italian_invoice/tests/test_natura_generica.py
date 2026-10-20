@@ -2,7 +2,9 @@
 
 import frappe
 from frappe.tests import UnitTestCase
+from lxml import etree
 
+from italian_invoice.validation import XMLInvoiceValidator
 from italian_invoice.validation.natura import righe_con_natura_generica
 
 
@@ -23,11 +25,30 @@ class TestNaturaGenerica(UnitTestCase):
 
 	def test_sottocodici_e_altri_codici_ammessi(self):
 		for natura in ("N1", "N2.1", "N3.5", "N4", "N5", "N6.3", "N7", "", None):
-			doc = _doc(items=[{"custom_motivo_esenzione_iva": natura}], taxes=[{"custom_motivo_esenzione_iva": natura}])
+			doc = _doc(
+				items=[{"custom_motivo_esenzione_iva": natura}],
+				taxes=[{"custom_motivo_esenzione_iva": natura}],
+			)
 			self.assertEqual(righe_con_natura_generica(doc), [], natura)
 
 	def test_vecchio_campo_ignorato(self):
 		# Documenti esistenti: il Select nascosto tax_exemption_reason resta pieno ma non va nell'XML.
 		for motivo in ("N3.5", "", None):
-			doc = _doc(taxes=[{"tax_exemption_reason": "N6-Inversione Contabile", "custom_motivo_esenzione_iva": motivo}])
+			doc = _doc(
+				taxes=[
+					{"tax_exemption_reason": "N6-Inversione Contabile", "custom_motivo_esenzione_iva": motivo}
+				]
+			)
 			self.assertEqual(righe_con_natura_generica(doc), [], motivo)
+
+	def test_natura_generica_nell_xml(self):
+		# Solo la radice ha il namespace: la regola deve trovare la Natura nei figli senza prefisso.
+		root = etree.fromstring(
+			'<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">'
+			"<DatiRiepilogo><Natura>N3</Natura></DatiRiepilogo>"
+			"<DatiRiepilogo><Natura>N3.5</Natura></DatiRiepilogo>"
+			"</p:FatturaElettronica>"
+		)
+		validator = XMLInvoiceValidator()
+		validator._validate_natura(root)
+		self.assertEqual([(e["path"], e["severity"]) for e in validator.errors], [("DatiRiepilogo", "error")])
