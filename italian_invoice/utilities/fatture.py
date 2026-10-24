@@ -1,9 +1,10 @@
+import html
 import json
 import re
 
 import frappe
 from frappe import _
-from frappe.utils import convert_utc_to_system_timezone, cstr, flt, get_datetime
+from frappe.utils import convert_utc_to_system_timezone, cstr, flt, get_datetime, strip_html
 from frappe.utils.file_manager import remove_file
 
 from italian_invoice.validation import ValidationErrorFormatter, XMLInvoiceValidator
@@ -409,6 +410,23 @@ def get_xml_causale(doc):
 	return None
 
 
+# String1000LatinType ammette solo Basic Latin + Latin-1: i caratteri frequenti fuori range con un equivalente leggibile, gli altri si tolgono.
+XML_LATIN_SUBSTITUTIONS = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u20ac": "EUR"})
+NON_LATIN1 = re.compile(r"[^\x00-\xff]")
+
+
+def _to_latin1(text):
+	"""Testo per lo schema: solo Latin-1 e spazi singoli (xs:normalizedString non ammette a capo e tab)."""
+	return " ".join(NON_LATIN1.sub("", text.translate(XML_LATIN_SUBSTITUTIONS)).split())
+
+
+def xml_line_description(item):
+	"""<Descrizione> di riga: la descrizione della riga (periodi, riferimenti alla fattura stornata) senza HTML,
+	in Latin-1 e al massimo 1000 caratteri; il nome articolo se è vuota. `&` lo codifica già il render."""
+	text = _to_latin1(html.unescape(strip_html(item.description or ""))) or _to_latin1(item.item_name or "")
+	return text[:1000].replace("<", "&lt;").replace(">", "&gt;")
+
+
 def get_xml_bank_account(payment_term, custom_bank_account):
 	"""Conto del DettaglioPagamento, solo per il bonifico (MP05). Con la carta (MP08) l'IBAN fa credere a
 	chi riceve la fattura di doverla ancora pagare (SINV/26/00223: il Desk mette il conto predefinito su
@@ -523,6 +541,7 @@ def get_invoice_data(doc):
 
 	# Add optional cbmedical fields if they exist
 	for item in e_invoice_items:
+		item.xml_description = xml_line_description(item)
 		try:
 			item.custom_rdm = frappe.db.get_value("Item", item.item_code, "custom_rdm")
 		except Exception:
