@@ -229,6 +229,8 @@
             {% endfor %}
         </DatiBeniServizi>
 
+        {# DatiPagamento facoltativo: i resi senza fattura collegata non hanno scadenze (ERPNext le svuota) e un blocco senza DettaglioPagamento verrebbe scartato #}
+        {% if doc.payment_schedule %}
         <DatiPagamento>
             {% if doc.payment_schedule|length > 1 %}
                 <CondizioniPagamento>TP01</CondizioniPagamento>
@@ -259,5 +261,6 @@
                 </DettaglioPagamento>
             {% endfor %}
         </DatiPagamento>
+        {% endif %}
     </FatturaElettronicaBody>
 </p:FatturaElettronica>
