@@ -34,8 +34,8 @@ def integra_blocchi(doc_data, invoice_lines, company, is_return):
 		taxes.append(_riga_ritenuta(ritenuta, base_ritenuta, company, is_return))
 	bollo = doc_data.get("dati_bollo")
 	if bollo and bollo.get("bollo_virtuale") == "SI" and flt(bollo.get("importo_bollo")):
-		conto = _impostazione(company, "custom_account_bollo", "il conto del bollo")
-		taxes.append(_riga_tassa(conto, flt(bollo["importo_bollo"]), is_return, deduci=False, descrizione="Imposta di bollo"))
+		conto = impostazione_societa(company, "custom_account_bollo", "il conto del bollo")
+		taxes.append(riga_tassa(conto, flt(bollo["importo_bollo"]), is_return, deduci=False, descrizione="Imposta di bollo"))
 	campi = {
 		"custom_ritenuta_tipo": ", ".join(r.get("tipo_ritenuta") or "" for r in ritenute),
 		"custom_ritenuta_causale": ", ".join(r.get("causale_pagamento") or "" for r in ritenute),
@@ -44,7 +44,8 @@ def integra_blocchi(doc_data, invoice_lines, company, is_return):
 	return items, taxes, campi
 
 
-def _impostazione(company, campo, etichetta):
+def impostazione_societa(company, campo, etichetta):
+	"""Il valore di un campo della Company (conto o articolo) richiesto da un blocco del documento; errore esplicito se manca."""
 	valore = frappe.get_cached_value("Company", company, campo)
 	if not valore:
 		frappe.throw(
@@ -59,14 +60,14 @@ def _riga_cassa(cassa, company, is_return):
 	tipo = cassa.get("tipo_cassa")
 	if tipo not in TIPI_CASSA:
 		frappe.throw(_("Tipo di cassa previdenziale non previsto: {0}.").format(tipo))
-	item_code = _impostazione(company, "custom_item_cassa_previdenziale", "l'articolo della cassa previdenziale")
+	item_code = impostazione_societa(company, "custom_item_cassa_previdenziale", "l'articolo della cassa previdenziale")
 	return {
 		"item_code": item_code,
 		"description": f"{TIPI_CASSA[tipo]} {flt(cassa.get('al_cassa'))}% su {flt(cassa.get('imponibile_cassa')):.2f}",
 		"qty": -1 if is_return else 1,
 		"rate": abs(flt(cassa.get("importo_contributo_cassa"))),
 		"uom": frappe.get_cached_value("Item", item_code, "stock_uom"),
-		"expense_account": _impostazione(company, "custom_account_cassa_previdenziale", "il conto della cassa previdenziale"),
+		"expense_account": impostazione_societa(company, "custom_account_cassa_previdenziale", "il conto della cassa previdenziale"),
 		"tax_rate": cassa.get("aliquota_iva", 0),
 		"tax_nature": cassa.get("natura"),
 	}
@@ -85,12 +86,12 @@ def _riga_ritenuta(ritenuta, base, company, is_return):
 				tipo, importo, aliquota, base, attesa
 			)
 		)
-	conto = _impostazione(company, "custom_account_ritenuta", "il conto delle ritenute d'acconto")
-	return _riga_tassa(conto, importo, is_return, deduci=True, aliquota=aliquota,
+	conto = impostazione_societa(company, "custom_account_ritenuta", "il conto delle ritenute d'acconto")
+	return riga_tassa(conto, importo, is_return, deduci=True, aliquota=aliquota,
 		descrizione=f"Ritenuta d'acconto {aliquota}% ({TIPI_RITENUTA_GESTITI[tipo]})")
 
 
-def _riga_tassa(conto, importo, is_return, *, deduci, descrizione, aliquota=0):
+def riga_tassa(conto, importo, is_return, *, deduci, descrizione, aliquota=0):
 	"""Riga tasse a importo fisso sul totale; nelle note di credito il segno si inverte."""
 	return {
 		"charge_type": "Actual",

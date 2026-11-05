@@ -417,45 +417,30 @@ def process_supplier_invoice(
 		else:
 			company = invoice_data.get("company", frappe.defaults.get_user_default("Company"))
 
-		# Estrai dati documento
-		doc_data = extract_document_data(payload)
-
-		# Estrai righe fattura
-		invoice_lines = extract_invoice_lines(payload)
-
-		# Verifica se è una nota di credito (con fallback su importo negativo)
-		is_return, anomaly = _resolve_is_return(doc_data)
-		if anomaly:
-			frappe.msgprint(anomaly, alert=True, indicator="orange")
-
-		# Ritenuta, bollo, cassa previdenziale: righe e campi in più solo se il documento li ha
-		righe_extra, tasse_extra, campi_extra = integra_blocchi(doc_data, invoice_lines, company, is_return)
-		dati_pagamento = extract_dati_pagamento(payload)
-		totale_documento = flt(doc_data.get("importo_totale_documento"))
-		netto_da_pagare = totale_documento - flt(campi_extra.get("custom_ritenuta_importo"))
-		# Il piano dei pagamenti viene dal documento; le note di credito non ne hanno uno proprio
-		piano = [] if is_return else scadenze(dati_pagamento, doc_data["data"], netto_da_pagare, totale_documento)
+		c = componenti_fattura(payload, company)
+		if c.anomalia:
+			frappe.msgprint(c.anomalia, alert=True, indicator="orange")
 
 		# Crea Purchase Invoice
 		purchase_invoice = frappe.get_doc(
 			{
 				"doctype": "Purchase Invoice",
 				"supplier": supplier,
-				"posting_date": doc_data["data"],
+				"posting_date": c.documento["data"],
 				"company": company,
-				"currency": doc_data.get("divisa", "EUR"),
+				"currency": c.documento.get("divisa", "EUR"),
 				"is_paid": 0,
-				"is_return": 1 if is_return else 0,
+				"is_return": 1 if c.is_return else 0,
 				"status": "Draft",
 				"from_xml": 1,
-				"bill_no": doc_data["numero"],
-				"bill_date": doc_data["data"],
-				"items": prepare_invoice_items(invoice_lines, item_mappings, company, is_return) + righe_extra,
-				"taxes": prepare_invoice_taxes(extract_tax_summary(payload), company, is_return) + tasse_extra,
-				"payment_schedule": piano,
-				"custom_iban_fornitore": iban_fornitore(dati_pagamento),
-				**({"due_date": max(r["due_date"] for r in piano)} if piano else {}),
-				**campi_extra,
+				"bill_no": c.documento["numero"],
+				"bill_date": c.documento["data"],
+				"items": prepare_invoice_items(c.righe, item_mappings, company, c.is_return) + c.righe_extra,
+				"taxes": c.tasse,
+				"payment_schedule": c.piano,
+				"custom_iban_fornitore": c.iban,
+				**({"due_date": max(r["due_date"] for r in c.piano)} if c.piano else {}),
+				**c.campi,
 			}
 		)
 
@@ -480,6 +465,33 @@ def process_supplier_invoice(
 	except Exception as e:
 		frappe.log_error(f"Errore importazione: {str(e)}", "Italian Invoice Passive")
 		frappe.throw(f"Errore importazione fattura: {str(e)}")
+
+
+def componenti_fattura(payload, company):
+	"""Quello che la Purchase Invoice prende dal documento prima degli articoli scelti dall'operatore: testata, segno
+	(nota di credito), righe e tasse dei blocchi (ritenuta, bollo, cassa previdenziale), righe IVA, netto da pagare,
+	piano dei pagamenti, IBAN. Un solo punto per l'importazione e per chi mostra in anticipo cosa verrà registrato."""
+	doc_data = extract_document_data(payload)
+	invoice_lines = extract_invoice_lines(payload)
+	is_return, anomaly = _resolve_is_return(doc_data)
+	righe_extra, tasse_extra, campi = integra_blocchi(doc_data, invoice_lines, company, is_return)
+	dati_pagamento = extract_dati_pagamento(payload)
+	totale = flt(doc_data.get("importo_totale_documento"))
+	netto = totale - flt(campi.get("custom_ritenuta_importo"))
+	return frappe._dict(
+		documento=doc_data,
+		righe=invoice_lines,
+		is_return=is_return,
+		anomalia=anomaly,
+		righe_extra=righe_extra,
+		tasse=prepare_invoice_taxes(extract_tax_summary(payload), company, is_return) + tasse_extra,
+		campi=campi,
+		totale=totale,
+		netto=netto,
+		# il piano dei pagamenti viene dal documento; le note di credito non ne hanno uno proprio
+		piano=[] if is_return else scadenze(dati_pagamento, doc_data["data"], netto, totale),
+		iban=iban_fornitore(dati_pagamento),
+	)
 
 
 def is_credit_note(tipo_documento):
