@@ -8,6 +8,9 @@ from difflib import SequenceMatcher
 
 import frappe
 from frappe import _
+from frappe.utils import flt
+
+from italian_invoice.utilities.fatture_passive_extra import iban_fornitore, integra_blocchi, scadenze
 
 SUPPLIER_PART_NO_MAX_LEN = 140
 
@@ -425,6 +428,14 @@ def process_supplier_invoice(
 		if anomaly:
 			frappe.msgprint(anomaly, alert=True, indicator="orange")
 
+		# Ritenuta, bollo, cassa previdenziale: righe e campi in più solo se il documento li ha
+		righe_extra, tasse_extra, campi_extra = integra_blocchi(doc_data, invoice_lines, company, is_return)
+		dati_pagamento = extract_dati_pagamento(payload)
+		totale_documento = flt(doc_data.get("importo_totale_documento"))
+		netto_da_pagare = totale_documento - flt(campi_extra.get("custom_ritenuta_importo"))
+		# Il piano dei pagamenti viene dal documento; le note di credito non ne hanno uno proprio
+		piano = [] if is_return else scadenze(dati_pagamento, doc_data["data"], netto_da_pagare, totale_documento)
+
 		# Crea Purchase Invoice
 		purchase_invoice = frappe.get_doc(
 			{
@@ -439,8 +450,12 @@ def process_supplier_invoice(
 				"from_xml": 1,
 				"bill_no": doc_data["numero"],
 				"bill_date": doc_data["data"],
-				"items": prepare_invoice_items(invoice_lines, item_mappings, company, is_return),
-				"taxes": prepare_invoice_taxes(extract_tax_summary(payload), company, is_return),
+				"items": prepare_invoice_items(invoice_lines, item_mappings, company, is_return) + righe_extra,
+				"taxes": prepare_invoice_taxes(extract_tax_summary(payload), company, is_return) + tasse_extra,
+				"payment_schedule": piano,
+				"custom_iban_fornitore": iban_fornitore(dati_pagamento),
+				**({"due_date": max(r["due_date"] for r in piano)} if piano else {}),
+				**campi_extra,
 			}
 		)
 
@@ -784,7 +799,9 @@ def _extract_from_payload(payload, body_path, default=None):
 	if "fattura_elettronica_body" in payload:
 		obj = payload["fattura_elettronica_body"][0]
 		for key in body_path:
-			obj = obj[key]
+			obj = obj.get(key) if isinstance(obj, dict) else None
+			if obj is None:
+				return default  # blocco assente nel documento
 		return obj
 	# Naviga il percorso diretto (senza fattura_elettronica_body)
 	obj = payload
@@ -809,6 +826,11 @@ def extract_invoice_lines(payload):
 def extract_tax_summary(payload):
 	"""Estrae riepilogo IVA"""
 	return _extract_from_payload(payload, ["dati_beni_servizi", "dati_riepilogo"], default=[])
+
+
+def extract_dati_pagamento(payload):
+	"""Estrae le condizioni di pagamento (lista, vuota se il documento non le ha)"""
+	return _extract_from_payload(payload, ["dati_pagamento"], default=[]) or []
 
 
 def calculate_total_discount(invoice_lines):
