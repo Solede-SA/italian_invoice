@@ -17,17 +17,26 @@ def execute(doc, method=None):
 	Vale solo per le società italiane: la fattura elettronica (SDI) è un obbligo
 	italiano — le fatture di società estere (es. svizzere) non passano da SDI.
 	"""
+	problemi = controlli(doc)
+	if problemi:
+		frappe.throw(problemi[0])
+
+
+def controlli(doc):
+	"""Tutti i problemi che fermerebbero la conferma, in lista: chi esamina una bozza (l'agente contabile) li
+	mostra insieme invece di scoprirli uno alla volta."""
 	if frappe.get_cached_value("Company", doc.company, "country") != "Italy":
-		return
+		return []
+	problemi = []
 
 	# Il Tipo di Documento (TD01, TD24, …) finisce nell'XML: obbligatorio al submit.
 	# Enforcement qui e non con reqd sul Custom Field, che bloccherebbe anche le
 	# fatture delle società estere (il metadato non distingue il paese).
 	if not doc.custom_tipo_di_documento:
-		frappe.throw(_("Sales Invoice {0}: Tipo di Documento mancante, obbligatorio per la fattura elettronica.").format(doc.name))
+		problemi.append(_("Sales Invoice {0}: Tipo di Documento mancante, obbligatorio per la fattura elettronica.").format(doc.name))
 
 	if not doc.customer_address:
-		frappe.throw(_("Sales Invoice {0}: indirizzo di fatturazione mancante, obbligatorio per la fattura elettronica.").format(doc.name))
+		problemi.append(_("Sales Invoice {0}: indirizzo di fatturazione mancante, obbligatorio per la fattura elettronica.").format(doc.name))
 
 	customer = frappe.db.get_value(
 		"Customer", doc.customer,
@@ -35,22 +44,22 @@ def execute(doc, method=None):
 		as_dict=True,
 	)
 	if not customer:
-		frappe.throw(_("Sales Invoice {0}: cliente {1} non trovato.").format(doc.name, doc.customer))
+		return [*problemi, _("Sales Invoice {0}: cliente {1} non trovato.").format(doc.name, doc.customer)]
 
 	# B2B: Partita IVA (tax_id). B2C / privati: Codice Fiscale (fiscal_code). Per la fattura
 	# elettronica ne basta uno dei due — i privati non hanno P.IVA.
 	if not (customer.tax_id or customer.fiscal_code or doc.get("tax_id")):
-		frappe.throw(_("Cliente {0}: Partita IVA / Codice Fiscale mancante, obbligatorio per la fattura elettronica.").format(doc.customer))
+		problemi.append(_("Cliente {0}: Partita IVA / Codice Fiscale mancante, obbligatorio per la fattura elettronica.").format(doc.customer))
 
 	if customer.is_public_administration and not customer.custom_codice_univoco:
-		frappe.throw(_("Cliente PA {0}: Codice Destinatario (codice univoco IPA) mancante, obbligatorio per fatturare alla Pubblica Amministrazione.").format(doc.customer))
+		problemi.append(_("Cliente PA {0}: Codice Destinatario (codice univoco IPA) mancante, obbligatorio per fatturare alla Pubblica Amministrazione.").format(doc.customer))
 
 	# Natura generica (N2, N3, N6) senza sottocodice: dal 1/1/2021 SdI scarta la fattura (00445).
 	righe = righe_con_natura_generica(doc)
 	if righe:
-		frappe.throw(
+		problemi.append(
 			_("Natura IVA generica non più ammessa da SdI (scarto 00445): {0}. Usare il sottocodice (es. N2.1, N3.2, N6.3).").format(
 				", ".join(righe)
-			),
-			title=_("Natura IVA da completare"),
+			)
 		)
+	return problemi
