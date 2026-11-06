@@ -262,6 +262,7 @@ doc_events = {
 		"on_submit": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_submit",
 		"on_cancel": "italian_invoice.utilities.fatture_passive.on_purchase_invoice_cancel",
 	},
+	"Customer": {"validate": "italian_invoice.crud_events.customer.validate"},
 }
 
 fixtures = [

@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from italian_invoice.utilities import codice_destinatario
 from italian_invoice.validation.natura import righe_con_natura_generica
 
 
@@ -53,6 +54,10 @@ def controlli(doc):
 
 	if customer.is_public_administration and not customer.custom_codice_univoco:
 		problemi.append(_("Cliente PA {0}: Codice Destinatario (codice univoco IPA) mancante, obbligatorio per fatturare alla Pubblica Amministrazione.").format(doc.customer))
+	# Un codice presente ma fuori formato (una minuscola) passerebbe la conferma e fermerebbe l'XML all'invio.
+	errore_codice = codice_destinatario.errore(doc.customer, customer.custom_codice_univoco, customer.is_public_administration)
+	if errore_codice:
+		problemi.append(errore_codice)
 
 	# Natura generica (N2, N3, N6) senza sottocodice: dal 1/1/2021 SdI scarta la fattura (00445).
 	righe = righe_con_natura_generica(doc)
