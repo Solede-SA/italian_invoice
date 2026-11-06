@@ -1135,7 +1135,7 @@ def get_default_item_code():
 		return "Servizi Generici"
 
 	# Altrimenti prendine uno qualsiasi di tipo servizio
-	service_item = frappe.db.get_value("Item", {"is_stock_item": 0, "disabled": 0}, "name")
+	service_item = frappe.db.get_value("Item", {"is_stock_item": 0, "is_purchase_item": 1, "disabled": 0}, "name")
 
 	if service_item:
 		return service_item
