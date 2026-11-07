@@ -199,6 +199,19 @@ class OpenAPIProvider(SDIProvider):
 			fattura = fattura or frappe.get_doc(transazione.tipo_fattura, transazione.fattura)
 			fattura.save()
 
+	@staticmethod
+	def _stato_dalle_notifiche(remote_status: dict):
+		"""Lo stato è il tipo dell'ultima notifica del Sistema di Interscambio (la risposta di OpenAPI non ha un campo
+		`status`). Senza notifiche lo stato resta quello che è: il Sistema di Interscambio non ha ancora risposto.
+		L'esito del committente (NE) qui non c'è: si legge sul portale, non si indovina."""
+		notifiche = remote_status.get("notifications") or []
+		if not notifiche:
+			return None
+		stato = max(notifiche, key=lambda notifica: notifica["created_at"])["type"]
+		if stato == "NE":
+			frappe.throw(frappe._("Notifica di esito del committente: l'esito non è nella risposta di OpenAPI, va letto sul portale."))
+		return stato
+
 	def reconcile_status(self, transazione_sdi_name: str) -> dict:
 		"""
 		Interroga OpenAPI per lo stato reale di una transazione già inviata.
@@ -226,7 +239,7 @@ class OpenAPIProvider(SDIProvider):
 		self._apply_status_update(
 			transazione,
 			"manual-reconcile",
-			remote_status.get("status"),
+			self._stato_dalle_notifiche(remote_status),
 			data_notifica,
 			remote_status,
 			fattura=fattura,
