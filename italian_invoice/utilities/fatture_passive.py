@@ -10,7 +10,13 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from italian_invoice.utilities.fatture_passive_extra import iban_fornitore, integra_blocchi, scadenze
+from italian_invoice.utilities.fatture_passive_extra import (
+	iban_fornitore,
+	impostazione_societa,
+	integra_blocchi,
+	righe_inversione,
+	scadenze,
+)
 
 SUPPLIER_PART_NO_MAX_LEN = 140
 
@@ -951,92 +957,41 @@ def get_line_quantity(line):
 	return 1
 
 
+def iva_significativa(summary):
+	"""Una voce del riepilogo IVA conta se ha un'aliquota o una natura (il 0% senza natura non dice nulla)."""
+	return flt(summary.get("aliquota_iva")) or summary.get("natura")
+
+
+# Esigibilità dell'IVA nella descrizione della riga (immediata: niente).
+ESIGIBILITA = {"S": " (Split Payment)", "D": " (Differita)"}
+
+
 def prepare_invoice_taxes(invoice_summary, company, is_return=False):
-	"""
-	Prepara le tasse per la fattura di acquisto.
-	Gestisce sia aliquote standard che righe con IVA 0% + natura (N1-N6).
-	Per reverse charge (N6) crea doppia riga: IVA credito + IVA debito.
-
-	Args:
-	    invoice_summary: Lista di riepiloghi IVA (dati_riepilogo)
-	    company: Nome della società
-	    is_return: True se è una nota di credito
-
-	Returns:
-	    Lista di dizionari per le tasse
-	"""
+	"""Le righe IVA della fattura di acquisto, una per riepilogo del documento, a importo fisso («Actual») sul conto IVA
+	sugli acquisti della società. ERPNext azzera l'aliquota delle righe a importo fisso: aliquota e imponibile del
+	documento restano in custom_aliquota_iva e custom_imponibile, per il registro IVA. Il 0% con natura è una riga a
+	importo 0; l'inversione contabile (N6) è la coppia IVA a credito e IVA a debito della società.
+	Nelle note di credito i segni si invertono."""
 	taxes = []
-
-	for summary in invoice_summary:
-		tax_rate = float(summary.get("aliquota_iva", 0))
+	for summary in filter(iva_significativa, invoice_summary):
+		tax_rate = flt(summary.get("aliquota_iva"))
 		natura = summary.get("natura") or ""
-		esigibilita = summary.get("esigibilita_iva") or "I"
-		rif_normativo = summary.get("riferimento_normativo") or ""
-
-		tax_amount = invert_sign_for_credit_note(summary.get("imposta", 0), is_return)
-		total = invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return)
-
-		if tax_rate == 0 and natura:
-			# IVA 0% con natura: crea riga tax con importo 0 e conto IVA 0%
-			tax_account = get_tax_account(tax_rate, company)
-			description = rif_normativo or f"Natura {natura}"
-
-			taxes.append({
-				"charge_type": "Actual",
-				"account_head": tax_account,
-				"tax_amount": 0,
-				"rate": 0,
-				"description": description,
-				"total": total,
-			})
-
-			# Reverse charge (N6.x): crea anche riga IVA a debito speculare
-			if natura.startswith("N6"):
-				rc_tax_rate = _get_reverse_charge_rate(natura)
-				if rc_tax_rate > 0:
-					rc_credit_account = get_tax_account(rc_tax_rate, company, root_type="Asset")
-					rc_debit_account = get_tax_account(rc_tax_rate, company, root_type="Liability")
-					rc_amount = round(float(total) * rc_tax_rate / 100, 2)
-					rc_amount = invert_sign_for_credit_note(rc_amount, is_return)
-
-					taxes.append({
-						"charge_type": "Actual",
-						"account_head": rc_credit_account,
-						"tax_amount": rc_amount,
-						"rate": rc_tax_rate,
-						"description": f"IVA {rc_tax_rate}% RC credito ({natura})",
-						"total": total,
-					})
-					taxes.append({
-						"charge_type": "Actual",
-						"account_head": rc_debit_account,
-						"tax_amount": -rc_amount,
-						"rate": rc_tax_rate,
-						"description": f"IVA {rc_tax_rate}% RC debito ({natura})",
-						"total": total,
-					})
-		elif tax_rate == 0:
-			# IVA 0% senza natura: ignora (non è significativo)
+		if natura.startswith("N6"):
+			rate = _get_reverse_charge_rate(natura)
+			imponibile = abs(flt(summary.get("imponibile_importo")))
+			taxes += righe_inversione(
+				company, round(imponibile * rate / 100, 2), imponibile, [rate], f"IVA {rate:g}% RC ({natura})", is_return
+			)
 			continue
-		else:
-			# Aliquota standard (22%, 10%, 4%, ecc.)
-			tax_account = get_tax_account(tax_rate, company)
-
-			description = f"IVA {tax_rate}%"
-			if esigibilita == "S":
-				description += " (Split Payment)"
-			elif esigibilita == "D":
-				description += " (Differita)"
-
-			taxes.append({
-				"charge_type": "Actual",
-				"account_head": tax_account,
-				"tax_amount": tax_amount,
-				"rate": tax_rate,
-				"description": description,
-				"total": total,
-			})
-
+		taxes.append({
+			"charge_type": "Actual",
+			"account_head": impostazione_societa(company, "custom_account_iva_acquisti", _("il conto IVA sugli acquisti")),
+			"tax_amount": invert_sign_for_credit_note(summary.get("imposta", 0), is_return),
+			"custom_aliquota_iva": tax_rate,
+			"custom_imponibile": invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return),
+			"description": (summary.get("riferimento_normativo") or f"Natura {natura}") if natura
+			else f"IVA {tax_rate}%" + ESIGIBILITA.get(summary.get("esigibilita_iva"), ""),
+		})
 	return taxes
 
 
@@ -1045,44 +1000,6 @@ def _get_reverse_charge_rate(natura):
 	# N6.1-N6.9: in Italia l'aliquota standard per RC è 22%
 	# Può essere personalizzata in futuro
 	return 22.0
-
-
-def get_tax_account(tax_rate, company, root_type=None):
-	"""
-	Restituisce l'account IVA ACQUISTI in base all'aliquota.
-
-	Args:
-	    tax_rate: Aliquota IVA
-	    company: Nome company
-	    root_type: Se specificato, cerca solo in quel root_type
-
-	Returns:
-	    Nome dell'account IVA acquisti
-	"""
-	tax_rate = round(float(tax_rate), 2)
-
-	root_types = [root_type] if root_type else ["Asset", "Liability"]
-
-	for rt in root_types:
-		tax_account = frappe.db.get_all(
-			"Account",
-			{
-				"company": company,
-				"tax_rate": tax_rate,
-				"account_type": "Tax",
-				"root_type": rt,
-			},
-			["name"],
-			limit=1,
-		)
-		if tax_account:
-			return tax_account[0]["name"]
-
-	frappe.throw(
-		f"Account IVA Acquisti non trovato per aliquota {tax_rate}% (root_type={root_type or 'Asset/Liability'}) in {company}. "
-		f"Assicurarsi che esista un account con tax_rate={tax_rate} e account_type='Tax'."
-	)
-
 
 
 def get_or_create_item_code(line):
@@ -1108,18 +1025,12 @@ def get_or_create_item_code(line):
 
 
 def get_default_supplier_group():
-	"""Restituisce il gruppo fornitori di default"""
-	# Prima prova a prendere il default dal sistema
+	"""Il gruppo dei fornitori nuovi: quello predefinito delle Impostazioni Acquisti. Senza, l'importazione si ferma
+	(prima prendeva il primo gruppo trovato, a volte il gruppo di gruppi che ERPNext rifiuta)."""
 	default = frappe.db.get_single_value("Buying Settings", "supplier_group")
-	if default:
-		return default
-
-	# Cerca il primo gruppo disponibile (gestisce multilingua)
-	groups = frappe.get_all("Supplier Group", fields=["name"], limit=1)
-	if groups:
-		return groups[0]["name"]
-
-	frappe.throw("Nessun Supplier Group trovato nel sistema")
+	if not default:
+		frappe.throw(_("Per creare il fornitore serve il gruppo fornitori predefinito nelle Impostazioni Acquisti (Buying Settings)."))
+	return default
 
 
 def get_default_uom():

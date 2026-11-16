@@ -91,6 +91,23 @@ def _riga_ritenuta(ritenuta, base, company, is_return):
 		descrizione=f"Ritenuta d'acconto {aliquota}% ({TIPI_RITENUTA_GESTITI[tipo]})")
 
 
+def righe_inversione(company, imposta, imponibile, aliquote, descrizione, is_return=False):
+	"""IVA in inversione contabile: aggiunta sul conto a credito e tolta sul conto a debito della società, stesso
+	importo, totale invariato. Con una sola aliquota la riga a credito porta aliquota e imponibile per il registro IVA
+	(ERPNext azzera l'aliquota delle righe a importo fisso); con più aliquote il registro la segnala da completare."""
+	credito = riga_tassa(
+		impostazione_societa(company, "custom_account_iva_credito_inversione", _("il conto IVA a credito per inversione contabile")),
+		imposta, is_return, deduci=False, descrizione=descrizione,
+	)
+	if len(aliquote) == 1:
+		credito.update({"custom_aliquota_iva": aliquote[0], "custom_imponibile": -imponibile if is_return else imponibile})
+	debito = riga_tassa(
+		impostazione_societa(company, "custom_account_iva_debito_inversione", _("il conto IVA a debito per inversione contabile")),
+		imposta, is_return, deduci=True, descrizione=descrizione,
+	)
+	return [credito, debito]
+
+
 def riga_tassa(conto, importo, is_return, *, deduci, descrizione, aliquota=0):
 	"""Riga tasse a importo fisso sul totale; nelle note di credito il segno si inverte."""
 	return {

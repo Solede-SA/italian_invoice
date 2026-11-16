@@ -1,6 +1,12 @@
+from collections import defaultdict
+
 import frappe
 from frappe import _
-from frappe.utils import flt
+
+# Le aliquote con le loro colonne di imponibile e imposta.
+RATES = (22, 10, 5, 4)
+# Le colonne degli importi, a zero prima di sommare le righe IVA della fattura.
+ZERI = dict.fromkeys([f"{k}_{r}" for r in RATES for k in ("imponibile", "imposta")] + ["esente", "non_imponibile", "indetraibile"], 0)
 
 
 def execute(filters=None):
@@ -155,6 +161,7 @@ def get_data(filters):
 
 	data = []
 	progressive = 1
+	taxes = get_tax_breakdown([invoice.name for invoice in invoices])
 
 	for invoice in invoices:
 		row = {
@@ -164,63 +171,23 @@ def get_data(filters):
 			"name": invoice.name,
 			"supplier_name": invoice.supplier_name,
 			"tax_id": invoice.tax_id or "",
-			"imponibile_22": 0,
-			"imposta_22": 0,
-			"imponibile_10": 0,
-			"imposta_10": 0,
-			"imponibile_5": 0,
-			"imposta_5": 0,
-			"imponibile_4": 0,
-			"imposta_4": 0,
-			"esente": 0,
-			"non_imponibile": 0,
-			"indetraibile": 0,
+			**ZERI,
 			"totale": invoice.grand_total,
 			"note": "",
 		}
 
-		# Recupera le righe delle tasse
-		tax_breakdown = get_tax_breakdown(invoice.name)
-
-		# Raggruppa per aliquota
-		for tax in tax_breakdown:
-			rate = flt(tax.get("rate"))
-			base_amount = flt(tax.get("base_amount"))
-			tax_amount = flt(tax.get("tax_amount"))
-
-			# Gestione IVA non detraibile
-			if tax.get("add_deduct_tax") == "Deduct":
-				row["indetraibile"] += tax_amount
-				continue
-
-			if rate == 22:
-				row["imponibile_22"] += base_amount
-				row["imposta_22"] += tax_amount
-			elif rate == 10:
-				row["imponibile_10"] += base_amount
-				row["imposta_10"] += tax_amount
-			elif rate == 5:
-				row["imponibile_5"] += base_amount
-				row["imposta_5"] += tax_amount
-			elif rate == 4:
-				row["imponibile_4"] += base_amount
-				row["imposta_4"] += tax_amount
-			elif rate == 0:
-				# Gestione operazioni esenti/non imponibili
-				description = tax.get("description", "")
-				if description and ("esent" in description.lower() or "esclus" in description.lower()):
-					row["esente"] += base_amount
-				else:
-					row["non_imponibile"] += base_amount
+		missing = add_taxes(row, taxes[invoice.name])
 
 		# Aggiungi note per operazioni speciali
 		notes = []
-		if row["esente"] > 0:
+		if row["esente"]:
 			notes.append("Esente")
-		if row["non_imponibile"] > 0:
+		if row["non_imponibile"]:
 			notes.append("Non Imp.")
-		if row["indetraibile"] > 0:
+		if row["indetraibile"]:
 			notes.append("IVA Indetr.")
+		if missing:
+			notes.append(_("Riga IVA senza aliquota: da completare"))
 
 		# Verifica se è reverse charge
 		if is_reverse_charge(invoice.name):
@@ -234,48 +201,60 @@ def get_data(filters):
 	return data
 
 
-def get_tax_breakdown(invoice_name):
-	"""Recupera il dettaglio delle tasse per una fattura con calcolo imponibile"""
-	taxes = frappe.db.sql(
+def add_taxes(row, taxes):
+	"""Somma le righe IVA della fattura nelle colonne del registro; restituisce quante righe IVA non hanno l'aliquota."""
+	missing = 0
+	for tax in taxes:
+		if tax.add_deduct_tax == "Deduct":
+			continue  # ritenuta d'acconto, IVA a debito dell'inversione contabile: non sono IVA a credito
+		if tax.charge_type == "Actual":
+			# ERPNext azzera l'aliquota delle righe a importo fisso: quelle importate la portano in custom_aliquota_iva
+			if not (tax.aliquota or tax.imponibile):
+				if tax.account_type == "Tax" and tax.tax_amount:
+					missing += 1  # IVA inserita a mano: da completare
+				continue  # bollo e altre spese: non sono IVA
+			rate, base = tax.aliquota, tax.imponibile
+		elif tax.rate:
+			rate, base = tax.rate, tax.tax_amount * 100 / tax.rate
+		else:
+			continue
+		if rate in RATES:
+			row[f"imponibile_{rate:g}"] += base
+			# IVA su un conto di costo: indetraibile, imputata allo stesso conto del costo (studio Milesi)
+			row["indetraibile" if tax.root_type == "Expense" else f"imposta_{rate:g}"] += tax.tax_amount
+		elif rate == 0:
+			description = (tax.description or "").lower()
+			row["esente" if "esent" in description or "esclus" in description else "non_imponibile"] += base
+	return missing
+
+
+def get_tax_breakdown(invoice_names):
+	"""Le righe tasse delle fatture, raggruppate per fattura, con gli importi nella valuta della società."""
+	taxes = defaultdict(list)
+	for tax in frappe.db.sql(
 		"""
 		SELECT
-			account_head,
-			description,
-			rate,
-			base_tax_amount as tax_amount,
-			add_deduct_tax,
-			charge_type
-		FROM `tabPurchase Taxes and Charges`
-		WHERE parent = %s
-		ORDER BY idx
+			t.parent,
+			t.description,
+			t.add_deduct_tax,
+			t.charge_type,
+			t.rate,
+			t.base_tax_amount AS tax_amount,
+			t.custom_aliquota_iva AS aliquota,
+			t.custom_imponibile * p.conversion_rate AS imponibile,
+			a.root_type,
+			a.account_type
+		FROM `tabPurchase Taxes and Charges` t
+		JOIN `tabAccount` a ON a.name = t.account_head
+		JOIN `tabPurchase Invoice` p ON p.name = t.parent
+		WHERE t.parent IN %(names)s AND t.parenttype = 'Purchase Invoice'
+		ORDER BY t.parent, t.idx
 	""",
-		invoice_name,
+		{"names": invoice_names},
 		as_dict=1,
-	)
-
-	result = []
-	for tax in taxes:
-		base_amount = 0
-		tax_amount = flt(tax.get("tax_amount"))
-
-		# Calcola l'imponibile dalla tax_amount e rate
-		if tax_amount != 0 and flt(tax.get("rate")) != 0:
-			base_amount = tax_amount / (flt(tax.get("rate")) / 100)
-
-		# Aggiungi solo se c'è almeno un valore
-		if base_amount > 0 or tax_amount > 0:
-			result.append(
-				{
-					"account_head": tax.account_head,
-					"description": tax.description,
-					"rate": flt(tax.get("rate")),
-					"base_amount": base_amount,
-					"tax_amount": tax_amount,
-					"add_deduct_tax": tax.add_deduct_tax,
-				}
-			)
-
-	return result
+	):
+		taxes[tax.parent].append(tax)
+	return taxes
 
 
 def is_reverse_charge(invoice_name):
