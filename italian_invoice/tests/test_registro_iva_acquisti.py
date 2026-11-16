@@ -22,7 +22,7 @@ def _tax(tax_amount, aliquota=0, imponibile=0, **campi):
 	return frappe._dict(
 		{
 			"description": "IVA", "add_deduct_tax": "Add", "charge_type": "Actual", "rate": 0, "tax_amount": tax_amount,
-			"aliquota": aliquota, "imponibile": imponibile, "root_type": "Liability", "account_type": "Tax", **campi,
+			"aliquota": aliquota, "imponibile": imponibile, "account_type": "Tax", **campi,
 		}
 	)
 
@@ -40,10 +40,10 @@ class TestRegistroIvaAcquisti(UnitTestCase):
 			({"imponibile_22": 100, "imposta_22": 22, "imponibile_10": 50, "imposta_10": 5}, 0),
 		)
 
-	def test_iva_sul_conto_del_costo_e_indetraibile(self):
+	def test_iva_sul_conto_del_costo_o_del_cespite_e_indetraibile(self):
 		self.assertEqual(
-			_columns([_tax(7.66, 22, 34.84, root_type="Expense", account_type="")]),
-			({"imponibile_22": 34.84, "indetraibile": 7.66}, 0),
+			_columns([_tax(7.66, 22, 34.84, account_type=""), _tax(57.62, 22, 261.89, account_type="Fixed Asset")]),
+			({"imponibile_22": 296.73, "indetraibile": 65.28}, 0),
 		)
 
 	def test_ritenuta_e_debito_inversione_contabile_non_sono_iva_a_credito(self):
@@ -67,7 +67,7 @@ class TestRegistroIvaAcquisti(UnitTestCase):
 
 	def test_riga_iva_senza_aliquota_da_completare_il_bollo_non_conta(self):
 		self.assertEqual(
-			_columns([_tax(11), _tax(2, root_type="Expense", account_type="", description="Imposta di bollo")]),
+			_columns([_tax(11), _tax(2, account_type="", description="Imposta di bollo")]),
 			({}, 1),
 		)
 

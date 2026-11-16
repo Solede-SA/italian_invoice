@@ -220,8 +220,8 @@ def add_taxes(row, taxes):
 			continue
 		if rate in RATES:
 			row[f"imponibile_{rate:g}"] += base
-			# IVA su un conto di costo: indetraibile, imputata allo stesso conto del costo (studio Milesi)
-			row["indetraibile" if tax.root_type == "Expense" else f"imposta_{rate:g}"] += tax.tax_amount
+			# IVA fuori dai conti d'imposta: indetraibile, sul conto del costo (studio Milesi) o del cespite
+			row[f"imposta_{rate:g}" if tax.account_type == "Tax" else "indetraibile"] += tax.tax_amount
 		elif rate == 0:
 			description = (tax.description or "").lower()
 			row["esente" if "esent" in description or "esclus" in description else "non_imponibile"] += base
@@ -242,7 +242,6 @@ def get_tax_breakdown(invoice_names):
 			t.base_tax_amount AS tax_amount,
 			t.custom_aliquota_iva AS aliquota,
 			t.custom_imponibile * p.conversion_rate AS imponibile,
-			a.root_type,
 			a.account_type
 		FROM `tabPurchase Taxes and Charges` t
 		JOIN `tabAccount` a ON a.name = t.account_head
