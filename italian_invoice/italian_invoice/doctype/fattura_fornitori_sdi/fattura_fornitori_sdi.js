@@ -119,7 +119,6 @@ function show_items_dialog(frm, supplier_data) {
                             &nbsp;&nbsp; IVA: <strong>${iva}${natura}</strong>
                         </div>
                         ${codiceHtml}
-                        ${isZeroValue ? '<div style="font-size: 11px; color: #ffc107; margin-top: 4px;">(Opzionale)</div>' : ''}
                     </div>
                 `;
 
@@ -143,7 +142,7 @@ function show_items_dialog(frm, supplier_data) {
                         query: 'italian_invoice.utilities.fatture_passive.get_items_by_supplier',
                         filters: { 'default_supplier': supplier_data.name }
                     }),
-                    reqd: isZeroValue ? 0 : 1,
+                    reqd: 1,
                     only_select: true
                 });
                 dialog_fields.push({
@@ -151,7 +150,7 @@ function show_items_dialog(frm, supplier_data) {
                     fieldtype: 'Link',
                     options: 'Account',
                     fieldname: `account_${idx}`,
-                    reqd: isZeroValue ? 0 : 1,
+                    reqd: 1,
                     get_query: () => ({
                         filters: { 'is_group': 0, 'company': frm.doc.company }
                     })
@@ -183,8 +182,6 @@ function show_items_dialog(frm, supplier_data) {
                     let remember_mappings = [];
 
                     invoice_lines.forEach((line, idx) => {
-                        if (!values[`item_${idx}`]) return;
-
                         item_mappings[line.numero_linea] = {
                             item_code: values[`item_${idx}`],
                             account: values[`account_${idx}`],

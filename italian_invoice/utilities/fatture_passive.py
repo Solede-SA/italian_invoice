@@ -219,14 +219,15 @@ def save_item_supplier_mappings(mappings, supplier_name):
 
 
 @frappe.whitelist()
-def create_supplier_item(item_name, item_group, uom, expense_account, company, supplier, supplier_part_no):
+def create_supplier_item(item_name, item_group, uom, expense_account, company, supplier=None, supplier_part_no=None, item_code=None):
 	"""
-	Crea un Item di acquisto non-stock associato al fornitore.
-	Chiamata dal dialog 'Crea Nuovo Item' delle fatture passive.
+	Crea un Item di acquisto non-stock col conto di costo predefinito della società.
+	Chiamata dal dialog 'Crea Nuovo Item' delle fatture passive (codice = nome, legato al fornitore) e dagli articoli
+	generici senza fornitore (codice proprio, es. «GEN-FORMAZIONE»).
 	"""
 	item = frappe.get_doc({
 		"doctype": "Item",
-		"item_code": item_name,
+		"item_code": item_code or item_name,
 		"item_name": item_name,
 		"item_group": item_group,
 		"description": item_name,
@@ -242,7 +243,7 @@ def create_supplier_item(item_name, item_group, uom, expense_account, company, s
 		"supplier_items": [{
 			"supplier": supplier,
 			"supplier_part_no": _normalize_part_no(supplier_part_no),
-		}],
+		}] if supplier else [],
 	})
 	item.insert()
 	return item.name
@@ -1003,25 +1004,13 @@ def _get_reverse_charge_rate(natura):
 
 
 def get_or_create_item_code(line):
-	"""
-	Ottiene o crea un item code per la riga
-
-	Args:
-	    line: Riga fattura
-
-	Returns:
-	    Item code
-	"""
-	# Cerca per descrizione
+	"""L'articolo che ha per nome la descrizione della riga. Senza, l'importazione si ferma: un articolo scelto a
+	caso porta il suo conto (un cespite porta quello dei cespiti) e la fattura finisce sul conto sbagliato."""
 	descrizione = line.get("descrizione", "")
-
-	if descrizione:
-		item_code = frappe.db.get_value("Item", {"item_name": descrizione}, "name")
-		if item_code:
-			return item_code
-
-	# Usa item generico di default
-	return get_default_item_code()
+	item_code = descrizione and frappe.db.get_value("Item", {"item_name": descrizione}, "name")
+	if not item_code:
+		frappe.throw(_("Nessun articolo per la riga {0} «{1}»: scegli l'articolo della riga.").format(line.get("numero_linea"), descrizione))
+	return item_code
 
 
 def get_default_supplier_group():
@@ -1037,21 +1026,6 @@ def get_default_uom():
 	"""Restituisce l'UOM di default"""
 	default = frappe.db.get_single_value("Stock Settings", "stock_uom")
 	return default or "Nos"
-
-
-def get_default_item_code():
-	"""Restituisce l'item code di default per articoli generici"""
-	# Verifica se esiste un item generico
-	if frappe.db.exists("Item", "Servizi Generici"):
-		return "Servizi Generici"
-
-	# Altrimenti prendine uno qualsiasi di tipo servizio
-	service_item = frappe.db.get_value("Item", {"is_stock_item": 0, "is_purchase_item": 1, "disabled": 0}, "name")
-
-	if service_item:
-		return service_item
-
-	frappe.throw("Nessun articolo di tipo servizio trovato. Creare almeno un articolo generico.")
 
 
 def get_country_name(country_code):
