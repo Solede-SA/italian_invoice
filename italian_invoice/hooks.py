@@ -60,10 +60,9 @@ required_apps = ["erpnext"]
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "italian_invoice.utils.jinja_methods",
-# 	"filters": "italian_invoice.utils.jinja_filters"
-# }
+jinja = {
+	"filters": ["italian_invoice.utilities.fatture.is_bank_transfer"],
+}
 
 # Installation
 # ------------

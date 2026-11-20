@@ -427,12 +427,18 @@ def xml_line_description(item):
 	return text[:1000].replace("<", "&lt;").replace(">", "&gt;")
 
 
+def is_bank_transfer(payment_term):
+	"""Termine di pagamento a bonifico (MP05): solo lì vanno le coordinate bancarie, nell'XML e nel PDF
+	(filtro Jinja del modello di stampa di solede_italia)."""
+	return (payment_term.mode_of_payment_code or "").split("-")[0] == "MP05"
+
+
 def get_xml_bank_account(payment_term, custom_bank_account):
 	"""Conto del DettaglioPagamento, solo per il bonifico (MP05). Con la carta (MP08) l'IBAN fa credere a
 	chi riceve la fattura di doverla ancora pagare (SINV/26/00223: il Desk mette il conto predefinito su
 	ogni bozza aperta). ABI e CAB esistono solo per i conti italiani."""
 	name = payment_term.bank_account or custom_bank_account
-	if payment_term.mode_of_payment_code.split("-")[0] != "MP05" or not name:
+	if not is_bank_transfer(payment_term) or not name:
 		return None
 	bank_account = frappe.db.get_value("Bank Account", name, ["bank", "iban", "swift_number"], as_dict=True)
 	if not bank_account.iban:
