@@ -89,10 +89,12 @@ class TestNumerazione(IntegrationTestCase):
 		return doc.naming_series
 
 	def test_serie_di_italian_invoice(self):
-		fattura, nota = self._documento(), self._documento(is_return=1)
+		# la nota creata dal codice arriva col tipo della fattura stornata (make_sales_return copia il TD01)
+		fattura, nota = self._documento(), self._documento(is_return=1, custom_tipo_di_documento="TD01")
 		before_naming.execute(fattura)
 		before_naming.execute(nota)
 		self.assertEqual((fattura.naming_series, nota.naming_series), ("SINV/.YY./", "NCINV/.YY./"))
+		self.assertEqual(nota.custom_tipo_di_documento, "TD04")
 
 	def test_bozza_nome_provvisorio_serie_intatta(self):
 		serie = self._serie()
