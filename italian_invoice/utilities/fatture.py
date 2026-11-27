@@ -315,8 +315,10 @@ def get_billing_address(doc, invoice):
 
 		if not address:
 			frappe.throw(
-				frappe._("Nessun indirizzo di fatturazione trovato per l'azienda {0}. "
-				"Configurare un Address con 'Is Your Company Address' abilitato.").format(doc.name)
+				frappe._(
+					"Nessun indirizzo di fatturazione trovato per l'azienda {0}. "
+					"Configurare un Address con 'Is Your Company Address' abilitato."
+				).format(doc.name)
 			)
 
 		return address[0]
@@ -387,9 +389,9 @@ def check_invisible_chars(party):
 	for fieldname in ("tax_id", "fiscal_code"):
 		if INVISIBLE_CHARS.search(party.get(fieldname) or ""):
 			frappe.throw(
-				_("{0} {1}: il campo {2} contiene caratteri invisibili. Riscriverlo a mano in anagrafica.").format(
-					_(party.doctype), party.name, _(party.meta.get_label(fieldname))
-				)
+				_(
+					"{0} {1}: il campo {2} contiene caratteri invisibili. Riscriverlo a mano in anagrafica."
+				).format(_(party.doctype), party.name, _(party.meta.get_label(fieldname)))
 			)
 
 
@@ -411,7 +413,18 @@ def get_xml_causale(doc):
 
 
 # String1000LatinType ammette solo Basic Latin + Latin-1: i caratteri frequenti fuori range con un equivalente leggibile, gli altri si tolgono.
-XML_LATIN_SUBSTITUTIONS = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u20ac": "EUR"})
+XML_LATIN_SUBSTITUTIONS = str.maketrans(
+	{
+		"\u2019": "'",
+		"\u2018": "'",
+		"\u201c": '"',
+		"\u201d": '"',
+		"\u2013": "-",
+		"\u2014": "-",
+		"\u2026": "...",
+		"\u20ac": "EUR",
+	}
+)
 NON_LATIN1 = re.compile(r"[^\x00-\xff]")
 
 
@@ -442,7 +455,9 @@ def get_xml_bank_account(payment_term, custom_bank_account):
 		return None
 	bank_account = frappe.db.get_value("Bank Account", name, ["bank", "iban", "swift_number"], as_dict=True)
 	if not bank_account.iban:
-		frappe.throw(_("Il conto {0} non ha l'IBAN, che serve al bonifico nella fattura elettronica.").format(name))
+		frappe.throw(
+			_("Il conto {0} non ha l'IBAN, che serve al bonifico nella fattura elettronica.").format(name)
+		)
 	if bank_account.iban.startswith("IT"):
 		bank_account.abi, bank_account.cab = bank_account.iban[5:10], bank_account.iban[10:15]
 	return bank_account
@@ -780,9 +795,9 @@ def set_line_tax_rates(doc, items):
 		}
 		if len(rates) > 1:
 			frappe.throw(
-				_("Riga {0} ({1}): più aliquote IVA ({2}), la fattura elettronica ne ammette una per riga").format(
-					item.idx, item.item_code, ", ".join(cstr(rate) for rate in sorted(rates))
-				)
+				_(
+					"Riga {0} ({1}): più aliquote IVA ({2}), la fattura elettronica ne ammette una per riga"
+				).format(item.idx, item.item_code, ", ".join(cstr(rate) for rate in sorted(rates)))
 			)
 		item.tax_rate = rates.pop() if rates else 0.0
 
@@ -795,9 +810,9 @@ def set_line_exemption_reasons(items, tax_data):
 			continue
 		if not zero_rate_summary.get("tax_exemption_reason"):
 			frappe.throw(
-				_("Riga {0} ({1}): IVA a 0% senza Natura. Impostare il motivo di esenzione sulla riga tasse.").format(
-					item.idx, item.item_code
-				)
+				_(
+					"Riga {0} ({1}): IVA a 0% senza Natura. Impostare il motivo di esenzione sulla riga tasse."
+				).format(item.idx, item.item_code)
 			)
 		item.custom_motivo_esenzione_iva = zero_rate_summary["tax_exemption_reason"]
 
@@ -879,7 +894,9 @@ def get_invoice_summary(items, taxes, doc):
 				row for row in doc.item_wise_tax_details if row.tax_row == tax.name and row.rate == tax.rate
 			]
 			if not tax_detail_rows:
-				frappe.throw(f"La riga tasse '{tax.description}' non ha il dettaglio per item. Salvare la fattura prima di validare.")
+				frappe.throw(
+					f"La riga tasse '{tax.description}' non ha il dettaglio per item. Salvare la fattura prima di validare."
+				)
 
 			summary = summary_data.setdefault(cstr(tax.rate), {"tax_amount": 0.0, "taxable_amount": 0.0})
 			for detail_row in tax_detail_rows:
@@ -1481,9 +1498,7 @@ def handle_sdi_webhook(endpoint, data):
 			if not transazioni:
 				if endpoint == "legal_storage_receipt":
 					# Le ricevute di conservazione arrivano anche per il ciclo passivo.
-					fattura_passiva = frappe.db.get_value(
-						"Fattura Fornitori SDI", {"uuid": uuid}, "name"
-					)
+					fattura_passiva = frappe.db.get_value("Fattura Fornitori SDI", {"uuid": uuid}, "name")
 					if fattura_passiva:
 						return register_legal_storage_on_supplier_invoice(
 							fattura_passiva, data.get("data", data)

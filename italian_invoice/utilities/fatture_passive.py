@@ -203,6 +203,7 @@ def save_item_supplier_mappings(mappings, supplier_name):
 
 	# Raggruppa per item_code per caricare ogni Item una volta sola
 	from collections import defaultdict
+
 	items_to_update = defaultdict(list)
 	for item_code, part_no in valid:
 		if (item_code, part_no.lower()) not in existing_keys:
@@ -211,40 +212,53 @@ def save_item_supplier_mappings(mappings, supplier_name):
 	for item_code, part_nos in items_to_update.items():
 		item_doc = frappe.get_doc("Item", item_code)
 		for part_no in part_nos:
-			item_doc.append("supplier_items", {
-				"supplier": supplier_name,
-				"supplier_part_no": part_no,
-			})
+			item_doc.append(
+				"supplier_items",
+				{
+					"supplier": supplier_name,
+					"supplier_part_no": part_no,
+				},
+			)
 		item_doc.save(ignore_permissions=True)
 
 
 @frappe.whitelist()
-def create_supplier_item(item_name, item_group, uom, expense_account, company, supplier=None, supplier_part_no=None, item_code=None):
+def create_supplier_item(
+	item_name, item_group, uom, expense_account, company, supplier=None, supplier_part_no=None, item_code=None
+):
 	"""
 	Crea un Item di acquisto non-stock col conto di costo predefinito della società.
 	Chiamata dal dialog 'Crea Nuovo Item' delle fatture passive (codice = nome, legato al fornitore) e dagli articoli
 	generici senza fornitore (codice proprio, es. «GEN-FORMAZIONE»).
 	"""
-	item = frappe.get_doc({
-		"doctype": "Item",
-		"item_code": item_code or item_name,
-		"item_name": item_name,
-		"item_group": item_group,
-		"description": item_name,
-		"stock_uom": uom,
-		"is_stock_item": 0,
-		"is_sales_item": 0,
-		"is_purchase_item": 1,
-		"item_defaults": [{
-			"company": company,
-			"expense_account": expense_account,
-			"default_supplier": supplier,
-		}],
-		"supplier_items": [{
-			"supplier": supplier,
-			"supplier_part_no": _normalize_part_no(supplier_part_no),
-		}] if supplier else [],
-	})
+	item = frappe.get_doc(
+		{
+			"doctype": "Item",
+			"item_code": item_code or item_name,
+			"item_name": item_name,
+			"item_group": item_group,
+			"description": item_name,
+			"stock_uom": uom,
+			"is_stock_item": 0,
+			"is_sales_item": 0,
+			"is_purchase_item": 1,
+			"item_defaults": [
+				{
+					"company": company,
+					"expense_account": expense_account,
+					"default_supplier": supplier,
+				}
+			],
+			"supplier_items": [
+				{
+					"supplier": supplier,
+					"supplier_part_no": _normalize_part_no(supplier_part_no),
+				}
+			]
+			if supplier
+			else [],
+		}
+	)
 	item.insert()
 	return item.name
 
@@ -300,9 +314,9 @@ def find_matching_items(supplier_name, invoice_lines):
 			part_no_map[pn] = entry["item_code"]
 
 	# Tutti gli item_code del fornitore (da entrambe le fonti)
-	all_item_codes = list(set(
-		[e["item_code"] for e in from_supplier] + [e["item_code"] for e in from_default]
-	))
+	all_item_codes = list(
+		set([e["item_code"] for e in from_supplier] + [e["item_code"] for e in from_default])
+	)
 
 	# Dettagli degli item per il matching per similarità
 	items_details = []
@@ -981,18 +995,30 @@ def prepare_invoice_taxes(invoice_summary, company, is_return=False):
 			rate = _get_reverse_charge_rate(natura)
 			imponibile = abs(flt(summary.get("imponibile_importo")))
 			taxes += righe_inversione(
-				company, round(imponibile * rate / 100, 2), imponibile, [rate], f"IVA {rate:g}% RC ({natura})", is_return
+				company,
+				round(imponibile * rate / 100, 2),
+				imponibile,
+				[rate],
+				f"IVA {rate:g}% RC ({natura})",
+				is_return,
 			)
 			continue
-		taxes.append({
-			"charge_type": "Actual",
-			"account_head": impostazione_societa(company, "custom_account_iva_acquisti", _("il conto IVA sugli acquisti")),
-			"tax_amount": invert_sign_for_credit_note(summary.get("imposta", 0), is_return),
-			"custom_aliquota_iva": tax_rate,
-			"custom_imponibile": invert_sign_for_credit_note(summary.get("imponibile_importo", 0), is_return),
-			"description": (summary.get("riferimento_normativo") or f"Natura {natura}") if natura
-			else f"IVA {tax_rate}%" + ESIGIBILITA.get(summary.get("esigibilita_iva"), ""),
-		})
+		taxes.append(
+			{
+				"charge_type": "Actual",
+				"account_head": impostazione_societa(
+					company, "custom_account_iva_acquisti", _("il conto IVA sugli acquisti")
+				),
+				"tax_amount": invert_sign_for_credit_note(summary.get("imposta", 0), is_return),
+				"custom_aliquota_iva": tax_rate,
+				"custom_imponibile": invert_sign_for_credit_note(
+					summary.get("imponibile_importo", 0), is_return
+				),
+				"description": (summary.get("riferimento_normativo") or f"Natura {natura}")
+				if natura
+				else f"IVA {tax_rate}%" + ESIGIBILITA.get(summary.get("esigibilita_iva"), ""),
+			}
+		)
 	return taxes
 
 
@@ -1009,7 +1035,11 @@ def get_or_create_item_code(line):
 	descrizione = line.get("descrizione", "")
 	item_code = descrizione and frappe.db.get_value("Item", {"item_name": descrizione}, "name")
 	if not item_code:
-		frappe.throw(_("Nessun articolo per la riga {0} «{1}»: scegli l'articolo della riga.").format(line.get("numero_linea"), descrizione))
+		frappe.throw(
+			_("Nessun articolo per la riga {0} «{1}»: scegli l'articolo della riga.").format(
+				line.get("numero_linea"), descrizione
+			)
+		)
 	return item_code
 
 
@@ -1018,7 +1048,11 @@ def get_default_supplier_group():
 	(prima prendeva il primo gruppo trovato, a volte il gruppo di gruppi che ERPNext rifiuta)."""
 	default = frappe.db.get_single_value("Buying Settings", "supplier_group")
 	if not default:
-		frappe.throw(_("Per creare il fornitore serve il gruppo fornitori predefinito nelle Impostazioni Acquisti (Buying Settings)."))
+		frappe.throw(
+			_(
+				"Per creare il fornitore serve il gruppo fornitori predefinito nelle Impostazioni Acquisti (Buying Settings)."
+			)
+		)
 	return default
 
 
