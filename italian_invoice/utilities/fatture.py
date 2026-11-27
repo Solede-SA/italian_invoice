@@ -20,6 +20,12 @@ JSON_PATHS = {
 		["invoice", "payload"],
 		["payload"],
 	],
+	# Quando il provider ha ricevuto la fattura dal Sistema di Interscambio (ISO con fuso, UTC)
+	"ricevuta": [
+		["data", "data", "invoice", "created_at"],
+		["data", "invoice", "created_at"],
+		["invoice", "created_at"],
+	],
 	"fattura_body": [
 		["data", "data", "invoice", "payload", "fattura_elettronica_body"],
 		["data", "invoice", "payload", "fattura_elettronica_body"],
@@ -144,6 +150,22 @@ def get_invoice_payload(invoice_data):
 	if not result:
 		frappe.throw("Impossibile estrarre il payload dalla struttura JSON")
 	return result
+
+
+def ora_del_sito(timestamp):
+	"""Timestamp ISO con fuso (UTC) → datetime naive nel fuso del sito, come lo salva MariaDB."""
+	return convert_utc_to_system_timezone(get_datetime(timestamp)).replace(tzinfo=None)
+
+
+def data_ricezione(invoice_data):
+	"""Il giorno, nel fuso del sito, in cui la fattura ricevuta è arrivata dal Sistema di Interscambio: è la data di
+	registrazione della fattura di acquisto (l'IVA si detrae nel mese in cui la fattura si riceve)."""
+	ricevuta = get_value_from_json_paths(invoice_data, JSON_PATHS["ricevuta"])
+	if not ricevuta:
+		frappe.throw(
+			_("La fattura ricevuta non porta il momento di arrivo dal Sistema di Interscambio (created_at).")
+		)
+	return ora_del_sito(ricevuta).date()
 
 
 def get_fattura_body(invoice_data):
@@ -1443,9 +1465,7 @@ def register_legal_storage_on_supplier_invoice(fattura_passiva_name, receipt):
 	"""
 	doc = frappe.get_doc("Fattura Fornitori SDI", fattura_passiva_name)
 	doc.conservata = 1
-	# Timestamp ISO con timezone → datetime naive nel fuso del sito (MariaDB).
-	ricevuta_alle = get_datetime(receipt.get("receipt_received_at") or receipt["updated_at"])
-	doc.data_conservazione = convert_utc_to_system_timezone(ricevuta_alle).replace(tzinfo=None)
+	doc.data_conservazione = ora_del_sito(receipt.get("receipt_received_at") or receipt["updated_at"])
 	doc.save()
 	return {
 		"success": True,

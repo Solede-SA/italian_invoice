@@ -415,6 +415,7 @@ def process_supplier_invoice(
 
 		# Estrai dati fattura
 		from italian_invoice.utilities.fatture import (
+			data_ricezione,
 			get_invoice_payload,
 			get_supplier_vat_from_json,
 		)
@@ -447,7 +448,8 @@ def process_supplier_invoice(
 			{
 				"doctype": "Purchase Invoice",
 				"supplier": supplier,
-				"posting_date": c.documento["data"],
+				"posting_date": data_ricezione(invoice_data),
+				"set_posting_time": 1,
 				"company": company,
 				"currency": c.documento.get("divisa", "EUR"),
 				"is_paid": 0,
@@ -636,7 +638,7 @@ def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sd
 	Returns:
 	    Nome della Purchase Invoice creata
 	"""
-	from italian_invoice.utilities.fatture import get_fattura_body
+	from italian_invoice.utilities.fatture import data_ricezione, get_fattura_body
 
 	if doctype == "Purchase Order":
 		from erpnext.buying.doctype.purchase_order.purchase_order import (
@@ -659,11 +661,12 @@ def create_purchase_invoice_from_document(doc_name, doctype, bill_no, fattura_sd
 	# Estrai dati dalla Fattura Fornitori SDI
 	fattura_sdi = frappe.get_doc("Fattura Fornitori SDI", fattura_sdi_name)
 
-	# Estrai data fattura e allinea posting_date e bill_date
+	# Data del documento; si registra il giorno in cui la fattura è arrivata
 	bill_date = _get_bill_date_from_fattura_sdi(fattura_sdi)
 	if bill_date:
 		pi.bill_date = bill_date
-		pi.posting_date = bill_date
+	pi.posting_date = data_ricezione(fattura_sdi.dati_fattura)
+	pi.set_posting_time = 1
 
 	# Estrai e applica l'IVA dalla fattura SDI
 	body = get_fattura_body(fattura_sdi.dati_fattura)
