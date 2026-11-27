@@ -431,7 +431,7 @@ def get_invoice_data(doc):
 		transmission_format_code = "FPA12"
 
 	vat_collectability = doc.vat_collectability.split("-")[0] if hasattr(doc, "vat_collectability") else "I"
-	tax_data = get_invoice_summary(e_invoice_items, doc.taxes)
+	tax_data = get_invoice_summary(e_invoice_items, doc.taxes, doc)
 
 	conversion_rate = doc.conversion_rate if hasattr(doc, "conversion_rate") else 1
 
@@ -628,7 +628,7 @@ def get_invoice_data(doc):
 #     zip_stream.close()
 
 
-def get_invoice_summary(items, taxes):
+def get_invoice_summary(items, taxes, doc=None):
 	for item in items:
 		print("item.tax_rate", item.tax_rate)
 
@@ -710,18 +710,27 @@ def get_invoice_summary(items, taxes):
 				add_deduct_tax = tax.add_deduct_tax
 
 			if add_deduct_tax == "Add":
-				item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
-				print("item_wise_tax_detail", item_wise_tax_detail)
-				for rate_item in [
-					tax_item for tax_item in item_wise_tax_detail.items() if tax_item[1][0] == tax.rate
-				]:
-					key = cstr(tax.rate)
-					if not summary_data.get(key):
-						summary_data.setdefault(key, {"tax_amount": 0.0, "taxable_amount": 0.0})
-					summary_data[key]["tax_amount"] += rate_item[1][1]
-					summary_data[key]["taxable_amount"] += sum(
-						[item.net_amount for item in items if item.item_code == rate_item[0]]
-					)
+				if getattr(tax, "item_wise_tax_detail", None):
+					item_wise_tax_detail = json.loads(tax.item_wise_tax_detail)
+					print("item_wise_tax_detail", item_wise_tax_detail)
+					for rate_item in [
+						tax_item for tax_item in item_wise_tax_detail.items() if tax_item[1][0] == tax.rate
+					]:
+						key = cstr(tax.rate)
+						if not summary_data.get(key):
+							summary_data.setdefault(key, {"tax_amount": 0.0, "taxable_amount": 0.0})
+						summary_data[key]["tax_amount"] += rate_item[1][1]
+						summary_data[key]["taxable_amount"] += sum(
+							[item.net_amount for item in items if item.item_code == rate_item[0]]
+						)
+				elif doc and hasattr(doc, "item_wise_tax_details"):
+					for d in doc.item_wise_tax_details:
+						if d.tax_row == tax.name and d.rate == tax.rate:
+							key = cstr(tax.rate)
+							if not summary_data.get(key):
+								summary_data.setdefault(key, {"tax_amount": 0.0, "taxable_amount": 0.0})
+							summary_data[key]["tax_amount"] += d.amount
+							summary_data[key]["taxable_amount"] += getattr(d, "taxable_amount", 0.0)
 
 				for item in items:
 					key = cstr(tax.rate)
